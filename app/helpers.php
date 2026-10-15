@@ -31,14 +31,25 @@ function requiredText($value, $label)
     return $value;
 }
 
-function validateLocalDate($value, $label)
+function parseBrazilianDate($value, $label)
 {
-    $date = DateTime::createFromFormat('Y-m-d\\TH:i', $value);
+    $value = trim((string) $value);
+    $date = DateTime::createFromFormat('!d/m/Y', $value);
     $errors = DateTime::getLastErrors();
-    if (!$date || $date->format('Y-m-d\\TH:i') !== $value || ($errors && ($errors['warning_count'] || $errors['error_count']))) {
+    if (!$date || $date->format('d/m/Y') !== $value || ($errors && ($errors['warning_count'] || $errors['error_count']))) {
         throw new InvalidArgumentException('Informe uma data válida para ' . $label . '.');
     }
-    return $value;
+    return $date->format('Y-m-d');
+}
+
+function validateBrazilianDateTime($dateValue, $timeValue, $label)
+{
+    $date = parseBrazilianDate($dateValue, $label);
+    $time = trim((string) $timeValue);
+    if (!preg_match('/^(?:[01][0-9]|2[0-3]):[0-5][0-9]$/D', $time)) {
+        throw new InvalidArgumentException('Informe um horário válido para ' . $label . '.');
+    }
+    return $date . 'T' . $time;
 }
 
 function csrfToken()

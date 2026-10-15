@@ -22,7 +22,10 @@ O computador precisa ser Windows x64 e pode precisar do Microsoft Visual C++ Red
 
 ## Funcionalidades
 
-- Cadastro e consulta de clientes, motos e serviços.
-- OS relacionada ao cliente e à moto desse cliente, com serviços executados.
-- Data de criação, conclusão opcional ou fechamento posterior com data de término.
-- Descrição e valor das peças, valor da mão de obra e total calculado.
+- Cadastro e edição de clientes e motocicletas, com OS vinculadas.
+- Serviços executados são descritos livremente em cada OS; o usuário informa diretamente o valor da mão de obra e das peças.
+- Data e hora de término são registradas automaticamente ao faturar ou cancelar a OS.
+- O catálogo de serviços foi substituído por texto livre; nomes de OS antigas são migrados para a descrição. Novos bancos não criam as tabelas do catálogo; bancos existentes mantêm os dados legados sem usá-los.
+- A tela Financeiro filtra por intervalo usando criação para OS abertas, faturamento para OS faturadas e cancelamento para OS canceladas; exibe quantidade e valor total por status e as ordens do período. Cancelamentos antigos sem data registrada usam a data de criação como referência.
+- Datas digitadas no Financeiro e nas ordens de serviço usam o formato brasileiro `dd/mm/aaaa`; horários são informados separadamente.
+- Em `Utilidades`, escolha uma pasta para salvar um snapshot SQLite ou selecione uma pasta de backups para restaurar um arquivo válido. Restaurações substituem os dados atuais após validação.

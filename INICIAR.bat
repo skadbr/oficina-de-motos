@@ -30,9 +30,9 @@ if errorlevel 1 (
 
 if not exist "%ROOT%data" mkdir "%ROOT%data"
 if "%PORTABLE%"=="1" (
-    start "Oficina - servidor local" /D "%ROOT%" "%PHP_EXE%" -c "%PHP_HOME%\php.ini" -d extension_dir="%PHP_HOME%\ext" -d extension=pdo_sqlite -d extension=sqlite3 -S 127.0.0.1:8000 -t "%ROOT%public"
+    start "Oficina - servidor local" /D "%ROOT%" "%PHP_EXE%" -c "%PHP_HOME%\php.ini" -d extension_dir="%PHP_HOME%\ext" -d extension=pdo_sqlite -d extension=sqlite3 -d upload_max_filesize=512M -d post_max_size=512M -d max_input_time=180 -d max_execution_time=180 -S 127.0.0.1:8000 -t "%ROOT%public"
 ) else (
-    start "Oficina - servidor local" /D "%ROOT%" "%PHP_EXE%" -S 127.0.0.1:8000 -t "%ROOT%public"
+    start "Oficina - servidor local" /D "%ROOT%" "%PHP_EXE%" -d upload_max_filesize=512M -d post_max_size=512M -d max_input_time=180 -d max_execution_time=180 -S 127.0.0.1:8000 -t "%ROOT%public"
 )
 "%SystemRoot%\System32\timeout.exe" /t 2 /nobreak >nul
 start "" "http://127.0.0.1:8000"
