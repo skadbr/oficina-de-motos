@@ -110,13 +110,13 @@ foreach ($motorcycles as $motorcycle) {
     <aside>
         <p class="brand">Oficina <span>MOTO RACING</span></p>
         <nav aria-label="Navegação principal">
-            <?php foreach (array('motos', 'clientes', 'financeiro', 'ordens') as $key): ?>
+            <?php foreach (array('motos', 'clientes', 'ordens') as $key): ?>
                 <?php $pageTitle = $pageTitles[$key]; ?>
                 <a class="<?php echo $page === $key ? 'active' : ''; ?>" href="/?page=<?php echo e($key); ?>"><?php echo e($pageTitle); ?></a>
             <?php endforeach; ?>
             <div class="nav-group">
                 <span class="nav-group-title">Utilidades</span>
-                <?php foreach (array('backup', 'restaurar') as $key): ?>
+                <?php foreach (array('financeiro', 'backup', 'restaurar') as $key): ?>
                     <a class="<?php echo $page === $key ? 'active' : ''; ?>" href="/?page=<?php echo e($key); ?>"><?php echo e($pageTitles[$key]); ?></a>
                 <?php endforeach; ?>
             </div>
