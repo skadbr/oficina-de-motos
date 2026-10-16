@@ -144,6 +144,17 @@ class WorkshopModel
         return $statement->fetchAll();
     }
 
+    public function parts($search = '')
+    {
+        if ($search === '') {
+            return $this->db->query('SELECT * FROM parts ORDER BY name')->fetchAll();
+        }
+        $statement = $this->db->prepare('SELECT * FROM parts WHERE name LIKE ? OR description LIKE ? ORDER BY name');
+        $term = '%' . $search . '%';
+        $statement->execute(array($term, $term));
+        return $statement->fetchAll();
+    }
+
     public function findClient($id)
     {
         $statement = $this->db->prepare('SELECT * FROM clients WHERE id = ?');
@@ -158,6 +169,13 @@ class WorkshopModel
         return $statement->fetch();
     }
 
+    public function findPart($id)
+    {
+        $statement = $this->db->prepare('SELECT * FROM parts WHERE id = ?');
+        $statement->execute(array($id));
+        return $statement->fetch();
+    }
+
     public function orders($search = '')
     {
         $sql = "SELECT work_orders.*, clients.name AS client_name, motorcycles.brand, motorcycles.model, motorcycles.plate
@@ -167,11 +185,20 @@ class WorkshopModel
         if ($search === '') {
             $orders = $this->db->query($sql . ' ORDER BY work_orders.id DESC')->fetchAll();
         } else {
-            $statement = $this->db->prepare($sql . ' WHERE CAST(work_orders.id AS TEXT) LIKE ? OR clients.name LIKE ? OR motorcycles.brand LIKE ? OR motorcycles.model LIKE ? OR motorcycles.plate LIKE ? OR work_orders.parts_description LIKE ? OR work_orders.services_description LIKE ? OR work_orders.status LIKE ? OR work_orders.created_at LIKE ? OR work_orders.completed_at LIKE ? ORDER BY work_orders.id DESC');
+            $statement = $this->db->prepare($sql . ' WHERE CAST(work_orders.id AS TEXT) LIKE ? OR clients.name LIKE ? OR motorcycles.brand LIKE ? OR motorcycles.model LIKE ? OR motorcycles.plate LIKE ? OR work_orders.parts_description LIKE ? OR work_orders.services_description LIKE ? OR work_orders.status LIKE ? OR work_orders.created_at LIKE ? OR work_orders.completed_at LIKE ? OR EXISTS (SELECT 1 FROM work_order_parts WHERE work_order_parts.work_order_id = work_orders.id AND work_order_parts.part_name LIKE ?) ORDER BY work_orders.id DESC');
             $term = '%' . $search . '%';
-            $statement->execute(array_fill(0, 10, $term));
+            $statement->execute(array_fill(0, 11, $term));
             $orders = $statement->fetchAll();
         }
+        $partRows = $this->db->query('SELECT work_order_id, part_id, part_name, quantity, unit_price_cents, line_total_cents FROM work_order_parts ORDER BY id')->fetchAll();
+        $partsByOrder = array();
+        foreach ($partRows as $partRow) {
+            $partsByOrder[$partRow['work_order_id']][] = $partRow;
+        }
+        foreach ($orders as &$order) {
+            $order['part_items'] = isset($partsByOrder[$order['id']]) ? $partsByOrder[$order['id']] : array();
+        }
+        unset($order);
         return $orders;
     }
 
@@ -210,6 +237,9 @@ class WorkshopModel
         if (!$order) {
             return false;
         }
+        $parts = $this->db->prepare('SELECT part_id, part_name, quantity, unit_price_cents, line_total_cents FROM work_order_parts WHERE work_order_id = ? ORDER BY id');
+        $parts->execute(array($id));
+        $order['part_items'] = $parts->fetchAll();
         return $order;
     }
 
@@ -302,7 +332,33 @@ class WorkshopModel
         return $statement->rowCount() > 0;
     }
 
-    public function addOrder($clientId, $motorcycleId, $createdAt, $servicesDescription, $partsDescription, $partsCents, $laborCents)
+    public function addPart($name, $description, $stockQuantity, $salePriceCents)
+    {
+        $statement = $this->db->prepare('INSERT INTO parts (name, description, stock_quantity, sale_price_cents) VALUES (?, ?, ?, ?)');
+        $statement->execute(array($name, $description, $stockQuantity, $salePriceCents));
+        return $this->db->lastInsertId();
+    }
+
+    public function updatePart($id, $name, $description, $stockQuantity, $salePriceCents)
+    {
+        $statement = $this->db->prepare('UPDATE parts SET name = ?, description = ?, stock_quantity = ?, sale_price_cents = ? WHERE id = ?');
+        $statement->execute(array($name, $description, $stockQuantity, $salePriceCents, $id));
+        return $statement->rowCount() > 0 || $this->findPart($id);
+    }
+
+    public function deletePart($id)
+    {
+        $statement = $this->db->prepare('SELECT COUNT(*) FROM work_order_parts WHERE part_id = ?');
+        $statement->execute(array($id));
+        if ((int) $statement->fetchColumn() > 0) {
+            throw new \RuntimeException('Não é possível excluir: a peça está registrada no histórico de uma OS.');
+        }
+        $statement = $this->db->prepare('DELETE FROM parts WHERE id = ?');
+        $statement->execute(array($id));
+        return $statement->rowCount() > 0;
+    }
+
+    public function addOrder($clientId, $motorcycleId, $createdAt, $servicesDescription, $partItems, $laborCents)
     {
         $checkBike = $this->db->prepare('SELECT id FROM motorcycles WHERE id = ? AND client_id = ?');
         $checkBike->execute(array($motorcycleId, $clientId));
@@ -312,19 +368,22 @@ class WorkshopModel
 
         $this->db->beginTransaction();
         try {
-            $statement = $this->db->prepare('INSERT INTO work_orders (client_id, motorcycle_id, created_at, services_description, parts_description, parts_cents, labor_cents, total_cents, status) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)');
+            $statement = $this->db->prepare('INSERT INTO work_orders (client_id, motorcycle_id, created_at, services_description, parts_description, parts_cents, labor_cents, total_cents, stock_deducted, status) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0, ?)');
             $statement->execute(array(
                 $clientId,
                 $motorcycleId,
                 str_replace('T', ' ', $createdAt),
                 $servicesDescription,
-                $partsDescription,
-                $partsCents,
+                '',
+                0,
                 $laborCents,
-                $partsCents + $laborCents,
+                $laborCents,
                 'Aberta'
             ));
             $orderId = $this->db->lastInsertId();
+            $parts = $this->reserveOrderParts($orderId, $partItems);
+            $update = $this->db->prepare('UPDATE work_orders SET parts_description = ?, parts_cents = ?, total_cents = ?, stock_deducted = ? WHERE id = ?');
+            $update->execute(array($parts['description'], $parts['total_cents'], $parts['total_cents'] + $laborCents, $parts['deducted'] ? 1 : 0, $orderId));
             $this->db->commit();
             return $orderId;
         } catch (\Throwable $exception) {
@@ -333,7 +392,7 @@ class WorkshopModel
         }
     }
 
-    public function updateOrder($id, $clientId, $motorcycleId, $createdAt, $servicesDescription, $partsDescription, $partsCents, $laborCents)
+    public function updateOrder($id, $clientId, $motorcycleId, $createdAt, $servicesDescription, $partItems, $laborCents)
     {
         $current = $this->findOrder($id);
         if (!$current) {
@@ -345,10 +404,43 @@ class WorkshopModel
             throw new \InvalidArgumentException('A moto precisa pertencer ao cliente selecionado.');
         }
 
+        $hasLegacyParts = empty($current['part_items']) && (trim((string) $current['parts_description']) !== '' || (int) $current['parts_cents'] > 0);
+        $stockDeducted = (int) $current['stock_deducted'];
         $this->db->beginTransaction();
         try {
-            $statement = $this->db->prepare('UPDATE work_orders SET client_id = ?, motorcycle_id = ?, created_at = ?, services_description = ?, parts_description = ?, parts_cents = ?, labor_cents = ?, total_cents = ? WHERE id = ?');
-            $statement->execute(array(
+            if ($current['status'] === 'Cancelada') {
+                $partsCents = (int) $current['parts_cents'];
+                $partsDescription = $current['parts_description'];
+            } else {
+                $requestedQuantities = array();
+                foreach ($partItems as $item) {
+                    $partId = isset($item['id']) ? (int) $item['id'] : 0;
+                    $quantity = isset($item['quantity']) ? (int) $item['quantity'] : 0;
+                    if ($partId > 0 && $quantity > 0) {
+                        $requestedQuantities[$partId] = isset($requestedQuantities[$partId]) ? $requestedQuantities[$partId] + $quantity : $quantity;
+                    }
+                }
+                $priceOverrides = array();
+                foreach ($current['part_items'] as $oldItem) {
+                    $partId = (int) $oldItem['part_id'];
+                    if (isset($requestedQuantities[$partId]) && $requestedQuantities[$partId] === (int) $oldItem['quantity']) {
+                        $priceOverrides[$partId] = (int) $oldItem['unit_price_cents'];
+                    }
+                }
+                if ((int) $current['stock_deducted'] === 1) {
+                    $this->restoreOrderStock($id, true);
+                } else {
+                    $this->db->prepare('DELETE FROM work_order_parts WHERE work_order_id = ?')->execute(array($id));
+                }
+                $parts = $this->reserveOrderParts($id, $partItems, $priceOverrides);
+                $partsCents = $parts['total_cents'] + ($hasLegacyParts ? (int) $current['parts_cents'] : 0);
+                $partsDescription = $hasLegacyParts
+                    ? trim($current['parts_description'] . ($parts['description'] !== '' ? ', ' . $parts['description'] : ''))
+                    : $parts['description'];
+                $stockDeducted = $parts['deducted'] ? 1 : 0;
+            }
+            $statement = $this->db->prepare('UPDATE work_orders SET client_id = ?, motorcycle_id = ?, created_at = ?, services_description = ?, parts_description = ?, parts_cents = ?, labor_cents = ?, total_cents = ?' . ($current['status'] === 'Cancelada' ? '' : ', stock_deducted = ?') . ' WHERE id = ?');
+            $values = array(
                 $clientId,
                 $motorcycleId,
                 str_replace('T', ' ', $createdAt),
@@ -356,9 +448,13 @@ class WorkshopModel
                 $partsDescription,
                 $partsCents,
                 $laborCents,
-                $partsCents + $laborCents,
-                $id
-            ));
+                $partsCents + $laborCents
+            );
+            if ($current['status'] !== 'Cancelada') {
+                $values[] = $stockDeducted;
+            }
+            $values[] = $id;
+            $statement->execute($values);
             $this->db->commit();
             return true;
         } catch (\Throwable $exception) {
@@ -376,8 +472,89 @@ class WorkshopModel
 
     public function cancelOrder($orderId)
     {
-        $statement = $this->db->prepare("UPDATE work_orders SET status = 'Cancelada', cancelled_at = ? WHERE id = ? AND status = 'Aberta'");
-        $statement->execute(array(date('Y-m-d H:i:s'), $orderId));
-        return $statement->rowCount() > 0;
+        $this->db->beginTransaction();
+        try {
+            $current = $this->db->prepare("SELECT stock_deducted FROM work_orders WHERE id = ? AND status = 'Aberta'");
+            $current->execute(array($orderId));
+            $order = $current->fetch();
+            if (!$order) {
+                $this->db->rollBack();
+                return false;
+            }
+            if ((int) $order['stock_deducted'] === 1) {
+                $this->restoreOrderStock($orderId, false);
+            }
+            $statement = $this->db->prepare("UPDATE work_orders SET status = 'Cancelada', cancelled_at = ?, stock_deducted = 0 WHERE id = ? AND status = 'Aberta'");
+            $statement->execute(array(date('Y-m-d H:i:s'), $orderId));
+            $this->db->commit();
+            return $statement->rowCount() > 0;
+        } catch (\Throwable $exception) {
+            if ($this->db->inTransaction()) {
+                $this->db->rollBack();
+            }
+            throw $exception;
+        }
+    }
+
+    private function reserveOrderParts($orderId, $partItems, $priceOverrides = array())
+    {
+        if (!is_array($partItems)) {
+            throw new \InvalidArgumentException('A lista de peças da OS é inválida.');
+        }
+        $requested = array();
+        foreach ($partItems as $item) {
+            $partId = isset($item['id']) ? (int) $item['id'] : 0;
+            $quantity = isset($item['quantity']) ? (int) $item['quantity'] : 0;
+            if ($partId < 1 || $quantity < 1) {
+                throw new \InvalidArgumentException('Selecione uma peça e informe uma quantidade válida.');
+            }
+            $requested[$partId] = isset($requested[$partId]) ? $requested[$partId] + $quantity : $quantity;
+        }
+
+        $lookup = $this->db->prepare('SELECT id, name, stock_quantity, sale_price_cents FROM parts WHERE id = ?');
+        $decrement = $this->db->prepare('UPDATE parts SET stock_quantity = stock_quantity - ? WHERE id = ? AND stock_quantity >= ?');
+        $insert = $this->db->prepare('INSERT INTO work_order_parts (work_order_id, part_id, part_name, quantity, unit_price_cents, line_total_cents) VALUES (?, ?, ?, ?, ?, ?)');
+        $totalCents = 0;
+        $description = array();
+        foreach ($requested as $partId => $quantity) {
+            $lookup->execute(array($partId));
+            $part = $lookup->fetch();
+            if (!$part) {
+                throw new \InvalidArgumentException('Uma das peças selecionadas não existe mais no estoque.');
+            }
+            if ((int) $part['stock_quantity'] < $quantity) {
+                throw new \RuntimeException('Estoque insuficiente para ' . $part['name'] . '. Disponível: ' . (int) $part['stock_quantity'] . '.');
+            }
+            $decrement->execute(array($quantity, $partId, $quantity));
+            if ($decrement->rowCount() !== 1) {
+                throw new \RuntimeException('O estoque de ' . $part['name'] . ' foi alterado. Atualize a OS e tente novamente.');
+            }
+            $unitPrice = isset($priceOverrides[$partId]) ? $priceOverrides[$partId] : (int) $part['sale_price_cents'];
+            $lineTotal = $unitPrice * $quantity;
+            $insert->execute(array($orderId, $partId, $part['name'], $quantity, $unitPrice, $lineTotal));
+            $totalCents += $lineTotal;
+            $description[] = $part['name'] . ' x ' . $quantity;
+        }
+        return array(
+            'total_cents' => $totalCents,
+            'description' => implode(', ', $description),
+            'deducted' => count($requested) > 0
+        );
+    }
+
+    private function restoreOrderStock($orderId, $deleteLines)
+    {
+        $statement = $this->db->prepare('SELECT part_id, quantity FROM work_order_parts WHERE work_order_id = ?');
+        $statement->execute(array($orderId));
+        $restore = $this->db->prepare('UPDATE parts SET stock_quantity = stock_quantity + ? WHERE id = ?');
+        foreach ($statement->fetchAll() as $item) {
+            $restore->execute(array((int) $item['quantity'], (int) $item['part_id']));
+            if ($restore->rowCount() !== 1) {
+                throw new \RuntimeException('Não foi possível devolver uma peça ao estoque.');
+            }
+        }
+        if ($deleteLines) {
+            $this->db->prepare('DELETE FROM work_order_parts WHERE work_order_id = ?')->execute(array($orderId));
+        }
     }
 }

@@ -3,6 +3,7 @@
 /** @var string $page */
 /** @var array $clients */
 /** @var array $motorcycles */
+/** @var array $parts */
 /** @var array $orders */
 /** @var array $financialReport */
 /** @var array|null $editing */
@@ -30,6 +31,53 @@ foreach ($motorcycles as $motorcycle) {
         break;
     }
 }
+$activePartItems = $page === 'ordens' && $editing && isset($editing['part_items']) ? $editing['part_items'] : array();
+$editingOrder = $page === 'ordens' && is_array($editing);
+$partItemsForView = array();
+$partsForPicker = array();
+foreach ($activePartItems as $item) {
+    $availableQuantity = 0;
+    $catalogPriceCents = (int) $item['unit_price_cents'];
+    foreach ($parts as $part) {
+        if ((int) $part['id'] === (int) $item['part_id']) {
+            $availableQuantity = (int) $part['stock_quantity'];
+            $catalogPriceCents = (int) $part['sale_price_cents'];
+            if ($editingOrder && (int) $editing['stock_deducted'] === 1) {
+                $availableQuantity += (int) $item['quantity'];
+            }
+            break;
+        }
+    }
+    $partItemsForView[] = array(
+        'id' => (int) $item['part_id'],
+        'name' => $item['part_name'],
+        'quantity' => (int) $item['quantity'],
+        'unit_price_cents' => (int) $item['unit_price_cents'],
+        'catalog_price_cents' => $catalogPriceCents,
+        'available_quantity' => $availableQuantity
+    );
+}
+foreach ($parts as $part) {
+    $availableQuantity = (int) $part['stock_quantity'];
+    if ($editingOrder && (int) $editing['stock_deducted'] === 1) {
+        foreach ($activePartItems as $item) {
+            if ((int) $item['part_id'] === (int) $part['id']) {
+                $availableQuantity += (int) $item['quantity'];
+            }
+        }
+    }
+    $partsForPicker[] = array(
+        'id' => (int) $part['id'],
+        'name' => $part['name'],
+        'description' => $part['description'],
+        'sale_price_cents' => (int) $part['sale_price_cents'],
+        'available_quantity' => $availableQuantity
+    );
+}
+$partItemsJson = json_encode($partItemsForView, JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_AMP | JSON_HEX_QUOT);
+$legacyPartsDescription = $page === 'ordens' && $editing && !$activePartItems ? $editing['parts_description'] : '';
+$legacyPartsCents = $page === 'ordens' && $editing && !$activePartItems ? (int) $editing['parts_cents'] : 0;
+$partsLocked = $editingOrder && $editing['status'] === 'Cancelada';
 ?>
 <!doctype html>
 <html lang="pt-BR">
@@ -120,7 +168,7 @@ foreach ($motorcycles as $motorcycle) {
     <aside>
         <p class="brand">Oficina <span>MOTO RACING</span></p>
         <nav aria-label="Navegação principal">
-            <?php foreach (array('motos', 'clientes', 'ordens') as $key): ?>
+            <?php foreach (array('motos', 'pecas', 'clientes', 'ordens') as $key): ?>
                 <?php $pageTitle = $pageTitles[$key]; ?>
                 <a class="<?php echo $page === $key ? 'active' : ''; ?>" href="/?page=<?php echo e($key); ?>"><?php echo e($pageTitle); ?></a>
             <?php endforeach; ?>
@@ -248,6 +296,47 @@ foreach ($motorcycles as $motorcycle) {
                     <?php endif; ?>
                 </section>
             </div>
+        <?php elseif ($page === 'pecas'): ?>
+            <div class="layout">
+                <section class="panel"><h2 class="section-title">Peças cadastradas</h2>
+                    <div class="datatable-controls">
+                        <label class="datatable-search">Pesquisar<input type="search" id="part-table-search" value="<?php echo e($search); ?>" placeholder="Nome ou descrição"></label>
+                        <label class="datatable-length">Mostrar<select id="part-page-size"><option value="10" selected>10</option><option value="25">25</option><option value="50">50</option><option value="100">100</option></select> linhas</label>
+                    </div>
+                    <?php if (!$parts): ?><div class="empty">Nenhuma peça cadastrada.</div><?php else: ?>
+                        <div class="table-wrap"><table id="part-table"><thead><tr>
+                            <th aria-sort="none"><button type="button" class="table-sort" data-column="0">Peça <span class="table-sort-indicator" aria-hidden="true"></span></button></th>
+                            <th aria-sort="none"><button type="button" class="table-sort" data-column="1">Descrição <span class="table-sort-indicator" aria-hidden="true"></span></button></th>
+                            <th aria-sort="none"><button type="button" class="table-sort" data-column="2">Estoque <span class="table-sort-indicator" aria-hidden="true"></span></button></th>
+                            <th aria-sort="none"><button type="button" class="table-sort" data-column="3">Valor de venda <span class="table-sort-indicator" aria-hidden="true"></span></button></th>
+                            <th>Ações</th>
+                        </tr></thead><tbody>
+                            <?php foreach ($parts as $part): ?>
+                                <tr data-search="<?php echo e($part['name'] . ' ' . $part['description']); ?>">
+                                    <td class="primary" data-sort="<?php echo e($part['name']); ?>"><?php echo e($part['name']); ?></td>
+                                    <td data-sort="<?php echo e($part['description']); ?>"><?php echo e($part['description'] ?: '—'); ?></td>
+                                    <td data-sort="<?php echo (int) $part['stock_quantity']; ?>"><?php echo number_format((int) $part['stock_quantity'], 0, ',', '.'); ?></td>
+                                    <td data-sort="<?php echo (int) $part['sale_price_cents']; ?>"><?php echo money($part['sale_price_cents']); ?></td>
+                                    <td><div class="row-actions"><a class="text-button" href="/?page=pecas&amp;edit=<?php echo (int) $part['id']; ?>&amp;q=<?php echo urlencode($search); ?>">Editar</a><form method="post" onsubmit="return confirm('Excluir esta peça do estoque?');"><input type="hidden" name="csrf_token" value="<?php echo e($csrf); ?>"><input type="hidden" name="action" value="delete_part"><input type="hidden" name="id" value="<?php echo (int) $part['id']; ?>"><input type="hidden" name="return_q" value="<?php echo e($search); ?>"><button class="text-button delete-button" type="submit">Excluir</button></form></div></td>
+                                </tr>
+                            <?php endforeach; ?>
+                        </tbody></table></div>
+                    <?php endif; ?>
+                    <div class="datatable-footer"><span id="part-table-info" aria-live="polite"></span><div class="datatable-pagination"><button class="button secondary" type="button" id="part-previous">Anterior</button><span id="part-page-info"></span><button class="button secondary" type="button" id="part-next">Próxima</button></div></div>
+                    <div class="empty" id="part-no-matches" hidden>Nenhuma peça corresponde à pesquisa.</div>
+                </section>
+                <section class="panel"><h2 class="section-title"><?php echo $editing ? 'Editar peça' : 'Nova peça'; ?></h2>
+                    <form method="post" class="form-grid"><input type="hidden" name="csrf_token" value="<?php echo e($csrf); ?>"><input type="hidden" name="action" value="<?php echo $editing ? 'update_part' : 'add_part'; ?>"><input type="hidden" name="return_q" value="<?php echo e($search); ?>">
+                        <?php if ($editing): ?><input type="hidden" name="id" value="<?php echo (int) $editing['id']; ?>"><?php endif; ?>
+                        <label>Nome da peça<input name="name" required maxlength="150" value="<?php echo e($editing ? $editing['name'] : ''); ?>"></label>
+                        <label>Descritivo<textarea name="description" maxlength="1000"><?php echo e($editing ? $editing['description'] : ''); ?></textarea></label>
+                        <label>Quantidade em estoque<input type="number" name="stock_quantity" min="0" step="1" required value="<?php echo e($editing ? $editing['stock_quantity'] : '0'); ?>"></label>
+                        <label>Valor de venda (R$)<input name="sale_price" inputmode="decimal" required value="<?php echo $editing ? e(number_format($editing['sale_price_cents'] / 100, 2, ',', '.')) : '0,00'; ?>"></label>
+                        <button class="button" type="submit"><?php echo $editing ? 'Salvar alterações' : 'Cadastrar peça'; ?></button>
+                        <?php if ($editing): ?><a class="cancel-link" href="/?page=pecas&amp;q=<?php echo urlencode($search); ?>">Cancelar edição</a><?php endif; ?>
+                    </form>
+                </section>
+            </div>
         <?php elseif ($page === 'financeiro'): ?>
             <div class="stack">
                 <section class="panel">
@@ -371,8 +460,39 @@ foreach ($motorcycles as $motorcycle) {
                             </div>
                             <div class="two-col"><label>Data de criação<input type="text" name="created_date" value="<?php echo e($editing ? date('d/m/Y', strtotime($editing['created_at'])) : $todayForInput); ?>" inputmode="numeric" placeholder="dd/mm/aaaa" maxlength="10" pattern="[0-9]{2}/[0-9]{2}/[0-9]{4}" required></label><label>Hora de criação<input type="time" name="created_time" value="<?php echo e($editing ? date('H:i', strtotime($editing['created_at'])) : $currentTimeForInput); ?>" required></label></div>
                             <label>Serviços executados<textarea name="services_description" maxlength="2000" placeholder="Descreva os serviços realizados"><?php echo e($editing ? $editing['services_description'] : ''); ?></textarea></label>
-                            <label>Peças utilizadas<textarea name="parts_description" maxlength="1500" placeholder="Descreva as peças e quantidades"><?php echo e($editing ? $editing['parts_description'] : ''); ?></textarea></label>
-                            <div class="two-col"><label>Valor das peças (R$)<input name="parts_value" inputmode="decimal" value="<?php echo $editing ? e(number_format($editing['parts_cents'] / 100, 2, ',', '.')) : '0,00'; ?>" required></label><label>Mão de obra (R$)<input name="labor_value" inputmode="decimal" value="<?php echo $editing ? e(number_format($editing['labor_cents'] / 100, 2, ',', '.')) : '0,00'; ?>" required></label></div>
+                            <?php if ($legacyPartsDescription !== ''): ?><p class="form-hint">Peças anotadas antes do controle de estoque: <?php echo e($legacyPartsDescription); ?>. Esse valor histórico será preservado.</p><?php endif; ?>
+                            <div id="parts-picker" data-locked="<?php echo $partsLocked ? '1' : '0'; ?>" data-legacy-cents="<?php echo $legacyPartsCents; ?>">
+                                <input type="hidden" name="part_items" id="part-items" value="<?php echo e($partItemsJson ?: '[]'); ?>">
+                                <div class="select-row">
+                                    <div>
+                                        <label for="part-search">Pesquisar peça</label>
+                                        <div class="autocomplete">
+                                            <input type="search" id="part-search" placeholder="Digite o nome ou descrição" autocomplete="off" <?php echo $partsLocked ? 'disabled' : ''; ?> role="combobox" aria-autocomplete="list" aria-expanded="false" aria-controls="part-results">
+                                            <input type="hidden" id="part-selected-id">
+                                            <div class="autocomplete-results" id="part-results" role="listbox" hidden>
+                                                <?php foreach ($partsForPicker as $part): ?>
+                                                    <button type="button" role="option" aria-selected="false" id="part-option-<?php echo (int) $part['id']; ?>" data-id="<?php echo (int) $part['id']; ?>" data-name="<?php echo e($part['name']); ?>" data-description="<?php echo e($part['description']); ?>" data-price="<?php echo (int) $part['sale_price_cents']; ?>" data-stock="<?php echo (int) $part['available_quantity']; ?>" data-search="<?php echo e($part['name'] . ' ' . $part['description']); ?>">
+                                                        <?php echo e($part['name']); ?><small>Estoque: <?php echo (int) $part['available_quantity']; ?> · <?php echo money($part['sale_price_cents']); ?></small>
+                                                    </button>
+                                                <?php endforeach; ?>
+                                                <p id="part-no-results" hidden>Nenhuma peça encontrada.</p>
+                                            </div>
+                                        </div>
+                                        <span class="form-hint" id="part-selection-hint"><?php echo $partsLocked ? 'OS cancelada: peças registradas somente para consulta.' : 'Selecione uma peça para incluir na OS.'; ?></span>
+                                    </div>
+                                    <a class="button secondary" href="/?page=pecas">Cadastrar peça</a>
+                                </div>
+                                <div class="two-col">
+                                    <label>Quantidade<input type="number" id="part-quantity" min="1" step="1" value="1" <?php echo $partsLocked ? 'disabled' : ''; ?>></label>
+                                    <button class="button secondary" type="button" id="part-add-button" disabled <?php echo $partsLocked ? 'disabled' : ''; ?>>Adicionar peça</button>
+                                </div>
+                                <div class="table-wrap">
+                                    <table id="selected-parts-table"><thead><tr><th>Peça</th><th>Quantidade</th><th>Valor unitário</th><th>Subtotal</th><th></th></tr></thead><tbody id="selected-parts-body"></tbody></table>
+                                </div>
+                                <div class="empty" id="selected-parts-empty" hidden>Nenhuma peça adicionada.</div>
+                            </div>
+                            <?php if ($partsLocked): ?><p class="form-hint">A edição de uma OS cancelada não movimenta o estoque.</p><?php endif; ?>
+                            <div class="two-col"><label>Valor das peças (R$)<input type="text" id="parts-value" name="parts_value" value="<?php echo $editing ? e(number_format($editing['parts_cents'] / 100, 2, ',', '.')) : '0,00'; ?>" readonly></label><label>Mão de obra (R$)<input name="labor_value" inputmode="decimal" value="<?php echo $editing ? e(number_format($editing['labor_cents'] / 100, 2, ',', '.')) : '0,00'; ?>" required></label></div>
                             <p class="form-hint">O total é calculado automaticamente: peças + mão de obra.</p>
                             <button class="button" type="submit"><?php echo $editing ? 'Salvar OS' : 'Criar ordem de serviço'; ?></button>
                             <?php if ($editing): ?><a class="cancel-link" href="/?page=ordens&amp;q=<?php echo urlencode($search); ?>">Cancelar edição</a><?php endif; ?>
@@ -475,6 +595,174 @@ foreach ($motorcycles as $motorcycle) {
 </script>
 <script>
 (function () {
+    var picker = document.getElementById('parts-picker');
+    var search = document.getElementById('part-search');
+    var selectedId = document.getElementById('part-selected-id');
+    var results = document.getElementById('part-results');
+    var noResults = document.getElementById('part-no-results');
+    var quantityInput = document.getElementById('part-quantity');
+    var addButton = document.getElementById('part-add-button');
+    var itemsInput = document.getElementById('part-items');
+    var rowsBody = document.getElementById('selected-parts-body');
+    var emptyMessage = document.getElementById('selected-parts-empty');
+    var totalInput = document.getElementById('parts-value');
+    if (!picker || !search || !selectedId || !results || !noResults || !quantityInput || !addButton || !itemsInput || !rowsBody || !emptyMessage || !totalInput) return;
+
+    var locked = picker.getAttribute('data-locked') === '1';
+    var options = Array.prototype.slice.call(results.querySelectorAll('[role="option"]'));
+    var items = [];
+    try { items = JSON.parse(itemsInput.value || '[]'); } catch (error) { items = []; }
+    var selectedPart = null;
+    var visibleOptions = [];
+    var activeIndex = -1;
+
+    var formatMoney = function (cents) {
+        return 'R$ ' + (cents / 100).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    };
+    var closeResults = function () {
+        results.hidden = true;
+        search.setAttribute('aria-expanded', 'false');
+        search.removeAttribute('aria-activedescendant');
+        activeIndex = -1;
+    };
+    var renderResults = function () {
+        var query = search.value.trim().toLocaleLowerCase();
+        visibleOptions = options.filter(function (option) {
+            return option.getAttribute('data-search').toLocaleLowerCase().indexOf(query) !== -1;
+        }).slice(0, 10);
+        options.forEach(function (option) {
+            option.hidden = visibleOptions.indexOf(option) === -1;
+            option.classList.remove('active');
+            option.setAttribute('aria-selected', option.getAttribute('data-id') === selectedId.value ? 'true' : 'false');
+        });
+        noResults.hidden = visibleOptions.length > 0;
+        results.hidden = false;
+        search.setAttribute('aria-expanded', 'true');
+        search.removeAttribute('aria-activedescendant');
+        activeIndex = -1;
+    };
+    var renderItems = function () {
+        rowsBody.innerHTML = '';
+        var total = parseInt(picker.getAttribute('data-legacy-cents'), 10) || 0;
+        items.forEach(function (item, index) {
+            var quantity = parseInt(item.quantity, 10) || 0;
+            var unitPrice = parseInt(item.unit_price_cents, 10) || 0;
+            var lineTotal = quantity * unitPrice;
+            total += lineTotal;
+            var row = document.createElement('tr');
+            [item.name, String(quantity), formatMoney(unitPrice), formatMoney(lineTotal)].forEach(function (value) {
+                var cell = document.createElement('td');
+                cell.textContent = value;
+                row.appendChild(cell);
+            });
+            var actionCell = document.createElement('td');
+            if (!locked) {
+                var removeButton = document.createElement('button');
+                removeButton.type = 'button';
+                removeButton.className = 'text-button delete-button';
+                removeButton.textContent = 'Remover';
+                removeButton.addEventListener('click', function () {
+                    items.splice(index, 1);
+                    renderItems();
+                });
+                actionCell.appendChild(removeButton);
+            }
+            row.appendChild(actionCell);
+            rowsBody.appendChild(row);
+        });
+        itemsInput.value = JSON.stringify(items.map(function (item) { return { id: item.id, quantity: item.quantity }; }));
+        totalInput.value = (total / 100).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+        emptyMessage.hidden = items.length > 0;
+    };
+    var selectOption = function (option) {
+        selectedPart = {
+            id: parseInt(option.getAttribute('data-id'), 10),
+            name: option.getAttribute('data-name'),
+            salePrice: parseInt(option.getAttribute('data-price'), 10),
+            available: parseInt(option.getAttribute('data-stock'), 10)
+        };
+        selectedId.value = String(selectedPart.id);
+        search.value = selectedPart.name;
+        var existing = items.find(function (item) { return parseInt(item.id, 10) === selectedPart.id; });
+        var alreadySelected = existing ? parseInt(existing.quantity, 10) : 0;
+        var remaining = Math.max(0, selectedPart.available - alreadySelected);
+        quantityInput.value = remaining > 0 ? '1' : '0';
+        quantityInput.max = String(remaining);
+        addButton.disabled = locked || remaining === 0;
+        var hint = document.getElementById('part-selection-hint');
+        if (hint) hint.textContent = 'Estoque disponível para esta OS: ' + remaining + ' · ' + formatMoney(selectedPart.salePrice);
+        options.forEach(function (item) { item.setAttribute('aria-selected', item === option ? 'true' : 'false'); });
+        closeResults();
+    };
+    var setActiveOption = function (index) {
+        if (!visibleOptions.length) return;
+        activeIndex = (index + visibleOptions.length) % visibleOptions.length;
+        options.forEach(function (option) { option.classList.remove('active'); });
+        visibleOptions[activeIndex].classList.add('active');
+        search.setAttribute('aria-activedescendant', visibleOptions[activeIndex].id);
+    };
+
+    search.addEventListener('focus', renderResults);
+    search.addEventListener('input', function () {
+        selectedPart = null;
+        selectedId.value = '';
+        addButton.disabled = true;
+        renderResults();
+    });
+    search.addEventListener('keydown', function (event) {
+        if (event.key === 'ArrowDown') {
+            event.preventDefault();
+            if (results.hidden) renderResults();
+            setActiveOption(activeIndex < 0 ? 0 : activeIndex + 1);
+        } else if (event.key === 'ArrowUp') {
+            event.preventDefault();
+            setActiveOption(activeIndex < 0 ? visibleOptions.length - 1 : activeIndex - 1);
+        } else if (event.key === 'Enter' && !results.hidden && activeIndex >= 0) {
+            event.preventDefault();
+            selectOption(visibleOptions[activeIndex]);
+        } else if (event.key === 'Escape') {
+            closeResults();
+        }
+    });
+    options.forEach(function (option) {
+        option.addEventListener('mousedown', function (event) { event.preventDefault(); });
+        option.addEventListener('click', function () { selectOption(option); });
+    });
+    document.addEventListener('click', function (event) {
+        if (!results.contains(event.target) && event.target !== search) closeResults();
+    });
+    addButton.addEventListener('click', function () {
+        if (!selectedPart) return;
+        var quantity = parseInt(quantityInput.value, 10) || 0;
+        var existing = items.find(function (item) { return parseInt(item.id, 10) === selectedPart.id; });
+        var nextQuantity = quantity + (existing ? parseInt(existing.quantity, 10) : 0);
+        if (quantity < 1 || nextQuantity > selectedPart.available) {
+            var hint = document.getElementById('part-selection-hint');
+            if (hint) hint.textContent = 'Quantidade indisponível. Estoque máximo: ' + selectedPart.available + '.';
+            return;
+        }
+        if (existing) {
+            existing.quantity = nextQuantity;
+            existing.unit_price_cents = selectedPart.salePrice;
+        } else {
+            items.push({ id: selectedPart.id, name: selectedPart.name, quantity: quantity, unit_price_cents: selectedPart.salePrice, catalog_price_cents: selectedPart.salePrice, available_quantity: selectedPart.available });
+        }
+        renderItems();
+        search.value = '';
+        selectedId.value = '';
+        selectedPart = null;
+        quantityInput.value = '1';
+        quantityInput.removeAttribute('max');
+        addButton.disabled = true;
+        var hint = document.getElementById('part-selection-hint');
+        if (hint) hint.textContent = 'Selecione uma peça para incluir na OS.';
+        closeResults();
+    });
+    renderItems();
+}());
+</script>
+<script>
+(function () {
     var setupDataTable = function (prefix, rowLabel, emptyLabel) {
         var table = document.getElementById(prefix + '-table');
         var searchInput = document.getElementById(prefix + '-table-search');
@@ -562,6 +850,7 @@ foreach ($motorcycles as $motorcycle) {
 
     setupDataTable('client', 'clientes', 'Nenhum cliente cadastrado');
     setupDataTable('motorcycle', 'motocicletas', 'Nenhuma motocicleta cadastrada');
+    setupDataTable('part', 'peças', 'Nenhuma peça cadastrada');
     setupDataTable('order', 'ordens de serviço', 'Nenhuma ordem de serviço cadastrada');
 }());
 </script>

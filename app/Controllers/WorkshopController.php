@@ -17,7 +17,7 @@ class WorkshopController
         $error = '';
         $success = isset($_SESSION['success']) ? $_SESSION['success'] : '';
         unset($_SESSION['success']);
-        $pages = array('ordens', 'clientes', 'motos', 'financeiro', 'backup', 'restaurar');
+        $pages = array('ordens', 'clientes', 'motos', 'pecas', 'financeiro', 'backup', 'restaurar');
         $page = isset($_GET['page']) && in_array($_GET['page'], $pages, true) ? $_GET['page'] : 'ordens';
         $search = trim(isset($_GET['q']) ? $_GET['q'] : '');
         if ($page === 'backup' && isset($_GET['download'])) {
@@ -49,6 +49,7 @@ class WorkshopController
         $data = array(
             'clients' => $this->model->clients(),
             'motorcycles' => $this->model->motorcycles(),
+            'parts' => $this->model->parts(),
             'orders' => $this->model->orders(),
             'financialReport' => $page === 'financeiro' ? $this->model->financialReport($rangeFrom, $rangeTo) : array('summary' => array(), 'orders' => array()),
             'rangeFromDisplay' => date('d/m/Y', strtotime($rangeFrom)),
@@ -66,7 +67,7 @@ class WorkshopController
             'csrf' => csrfToken(),
             'todayForInput' => date('d/m/Y'),
             'currentTimeForInput' => date('H:i'),
-            'pageTitles' => array('motos' => 'Motocicletas', 'clientes' => 'Clientes', 'financeiro' => 'Financeiro', 'ordens' => 'Ordens de serviço', 'backup' => 'Fazer backup', 'restaurar' => 'Restaurar backup')
+            'pageTitles' => array('motos' => 'Motocicletas', 'clientes' => 'Clientes', 'pecas' => 'Peças', 'financeiro' => 'Financeiro', 'ordens' => 'Ordens de serviço', 'backup' => 'Fazer backup', 'restaurar' => 'Restaurar backup')
         );
         extract($data, EXTR_SKIP);
         require dirname(__DIR__) . '/Views/dashboard.php';
@@ -178,6 +179,33 @@ class WorkshopController
             }
             $this->flashAndRedirect('Motocicleta excluída.', 'motos', $this->submittedSearch());
         }
+        if ($action === 'add_part') {
+            $this->model->addPart(
+                requiredText(isset($_POST['name']) ? $_POST['name'] : '', 'nome da peça'),
+                trim(isset($_POST['description']) ? $_POST['description'] : ''),
+                $this->postNonNegativeInt('stock_quantity', 'quantidade em estoque'),
+                moneyToCents(isset($_POST['sale_price']) ? $_POST['sale_price'] : '0')
+            );
+            $this->flashAndRedirect('Peça cadastrada.', 'pecas');
+        }
+        if ($action === 'update_part') {
+            if (!$this->model->updatePart(
+                $this->postId('id'),
+                requiredText(isset($_POST['name']) ? $_POST['name'] : '', 'nome da peça'),
+                trim(isset($_POST['description']) ? $_POST['description'] : ''),
+                $this->postNonNegativeInt('stock_quantity', 'quantidade em estoque'),
+                moneyToCents(isset($_POST['sale_price']) ? $_POST['sale_price'] : '0')
+            )) {
+                throw new \RuntimeException('Peça não encontrada.');
+            }
+            $this->flashAndRedirect('Peça atualizada.', 'pecas', $this->submittedSearch());
+        }
+        if ($action === 'delete_part') {
+            if (!$this->model->deletePart($this->postId('id'))) {
+                throw new \RuntimeException('Peça não encontrada.');
+            }
+            $this->flashAndRedirect('Peça excluída.', 'pecas', $this->submittedSearch());
+        }
         if ($action === 'add_order') {
             $clientId = filter_var(isset($_POST['client_id']) ? $_POST['client_id'] : '', FILTER_VALIDATE_INT);
             $motorcycleId = filter_var(isset($_POST['motorcycle_id']) ? $_POST['motorcycle_id'] : '', FILTER_VALIDATE_INT);
@@ -185,13 +213,13 @@ class WorkshopController
                 throw new \InvalidArgumentException('Selecione o cliente e a moto.');
             }
             $createdAt = validateBrazilianDateTime(isset($_POST['created_date']) ? $_POST['created_date'] : '', isset($_POST['created_time']) ? $_POST['created_time'] : '', 'criação da OS');
+            $partItems = $this->submittedPartItems();
             $orderId = $this->model->addOrder(
                 $clientId,
                 $motorcycleId,
                 $createdAt,
                 trim(isset($_POST['services_description']) ? $_POST['services_description'] : ''),
-                trim(isset($_POST['parts_description']) ? $_POST['parts_description'] : ''),
-                moneyToCents(isset($_POST['parts_value']) ? $_POST['parts_value'] : '0'),
+                $partItems,
                 moneyToCents(isset($_POST['labor_value']) ? $_POST['labor_value'] : '0')
             );
             $this->flashAndRedirect('Ordem de serviço #' . $orderId . ' cadastrada.', 'ordens');
@@ -203,14 +231,14 @@ class WorkshopController
                 throw new \InvalidArgumentException('Selecione o cliente e a moto.');
             }
             $createdAt = validateBrazilianDateTime(isset($_POST['created_date']) ? $_POST['created_date'] : '', isset($_POST['created_time']) ? $_POST['created_time'] : '', 'criação da OS');
+            $partItems = $this->submittedPartItems();
             $this->model->updateOrder(
                 $this->postId('id'),
                 $clientId,
                 $motorcycleId,
                 $createdAt,
                 trim(isset($_POST['services_description']) ? $_POST['services_description'] : ''),
-                trim(isset($_POST['parts_description']) ? $_POST['parts_description'] : ''),
-                moneyToCents(isset($_POST['parts_value']) ? $_POST['parts_value'] : '0'),
+                $partItems,
                 moneyToCents(isset($_POST['labor_value']) ? $_POST['labor_value'] : '0')
             );
             $this->flashAndRedirect('Ordem de serviço atualizada.', 'ordens', $this->submittedSearch());
@@ -239,6 +267,9 @@ class WorkshopController
         }
         if ($page === 'motos') {
             return $this->model->findMotorcycle($id);
+        }
+        if ($page === 'pecas') {
+            return $this->model->findPart($id);
         }
         if ($page === 'ordens') {
             return $this->model->findOrder($id);
@@ -277,6 +308,25 @@ class WorkshopController
             throw new \InvalidArgumentException('Registro inválido.');
         }
         return $id;
+    }
+
+    private function postNonNegativeInt($field, $label)
+    {
+        $value = filter_var(isset($_POST[$field]) ? $_POST[$field] : '', FILTER_VALIDATE_INT);
+        if ($value === false || $value < 0) {
+            throw new \InvalidArgumentException('Informe uma ' . $label . ' válida.');
+        }
+        return $value;
+    }
+
+    private function submittedPartItems()
+    {
+        $raw = isset($_POST['part_items']) ? $_POST['part_items'] : '[]';
+        $items = json_decode($raw, true);
+        if (!is_array($items) || json_last_error() !== JSON_ERROR_NONE) {
+            throw new \InvalidArgumentException('A lista de peças da OS é inválida.');
+        }
+        return $items;
     }
 
     private function submittedSearch()
