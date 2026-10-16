@@ -5,6 +5,7 @@
 /** @var array $motorcycles */
 /** @var array $parts */
 /** @var array $orders */
+/** @var array|false $printOrder */
 /** @var array $financialReport */
 /** @var array|null $editing */
 /** @var string $success */
@@ -134,7 +135,12 @@ $partsLocked = $editingOrder && $editing['status'] === 'Cancelada';
         .date-range label { min-width: 180px; }
         .utility-actions { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
         .utility-select { max-width: 520px; }
-        .select-row { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 8px; align-items: end; }
+      /*.select-row { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 8px; align-items: end; } */
+        .select-row {
+                        display: flex;
+                        align-items: center; /* Alinha todos os filhos verticalmente no centro */
+                        gap: 15px;           /* Cria um espaçamento horizontal entre o campo e o botão */
+                    }
         .autocomplete { position: relative; }
         .autocomplete-results { position: absolute; z-index: 5; top: calc(100% + 3px); left: 0; right: 0; max-height: 280px; overflow-y: auto; border: 1px solid var(--line); border-radius: 3px; background: var(--white); box-shadow: 0 8px 20px #20272524; }
         .autocomplete-results[hidden], .autocomplete-results button[hidden], .autocomplete-results p[hidden] { display: none; }
@@ -154,16 +160,41 @@ $partsLocked = $editingOrder && $editing['status'] === 'Cancelada';
         .two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
         .button { display: inline-flex; align-items: center; justify-content: center; min-height: 40px; padding: 9px 14px; border: 0; border-radius: 3px; background: var(--green); color: #fff; font: inherit; font-weight: 650; cursor: pointer; text-decoration: none; }
         .button:hover { background: var(--green-dark); }
-        .button.secondary { min-height: 32px; padding: 5px 9px; font-size: 12px; }
+        /* .button.secondary { min-height: 32px; padding: 5px 9px; font-size: 12px; } */
+        .button.secondary {
+                                            margin: 0; /* Remove margens que possam puxar o botão para cima ou para baixo */
+                                        }
         .notice { margin-bottom: 18px; border-radius: 3px; padding: 11px 14px; background: #e5f1e9; color: var(--green-dark); }
         .notice.error { background: #f8e9e6; color: var(--red); }
         .empty { padding: 28px 15px; color: var(--muted); text-align: center; }
         .form-hint { color: var(--muted); font-size: 12px; font-weight: 400; }
+        .print-sheet { max-width: 900px; margin: 0 auto; padding: 30px; background: #fff; border: 1px solid var(--line); }
+        .print-heading { display: flex; align-items: start; justify-content: space-between; gap: 20px; padding-bottom: 18px; border-bottom: 2px solid var(--ink); }
+        .print-heading h2 { margin: 0; font-size: 23px; }
+        .print-meta { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; padding: 18px 0; }
+        .print-meta h3, .print-section h3 { margin: 0 0 8px; font-size: 14px; }
+        .print-meta p { margin: 3px 0; }
+        .print-section { margin-top: 18px; }
+        .print-total { margin-top: 18px; text-align: right; font-size: 17px; font-weight: 700; }
+        .print-actions { display: flex; gap: 10px; margin-bottom: 16px; }
+        .print-page .shell { display: block; min-height: auto; }
+        .print-page aside, .print-page .topline { display: none; }
+        .print-page main { padding: 20px; }
+        @media print {
+            body, .print-page { background: #fff; }
+            .print-page aside, .print-page .topline, .no-print { display: none !important; }
+            .print-page .shell { display: block; min-height: auto; }
+            .print-page main { padding: 0; }
+            .print-sheet { max-width: none; padding: 0; border: 0; }
+            .print-sheet, .print-sheet * { color: #000 !important; }
+            .print-sheet table { page-break-inside: auto; }
+            .print-sheet tr { page-break-inside: avoid; }
+        }
         @media (max-width: 850px) { .shell { grid-template-columns: 1fr; } aside { padding: 17px 18px; } .brand { margin: 0 0 12px; } nav { display: flex; overflow-x: auto; } nav a { white-space: nowrap; } main { padding: 25px 18px; } .layout { grid-template-columns: 1fr; } }
         @media (max-width: 520px) { h1 { font-size: 25px; } .panel { padding: 15px; } .two-col { grid-template-columns: 1fr; } }
     </style>
 </head>
-<body>
+<body class="<?php echo $page === 'imprimir' ? 'print-page' : ''; ?>">
 <div class="shell">
     <aside>
         <p class="brand">Oficina <span>MOTO RACING</span></p>
@@ -403,6 +434,66 @@ $partsLocked = $editingOrder && $editing['status'] === 'Cancelada';
                     </div>
                 </section>
             </div>
+        <?php elseif ($page === 'imprimir'): ?>
+            <?php if (!$printOrder): ?>
+                <div class="notice error">Ordem de serviço não encontrada.</div>
+                <a class="button no-print" href="/?page=ordens">Voltar para ordens de serviço</a>
+            <?php else: ?>
+                <div class="print-actions no-print">
+                    <button class="button" type="button" onclick="window.print()">Imprimir OS</button>
+                    <a class="button secondary" href="/?page=ordens">Voltar</a>
+                </div>
+                <article class="print-sheet">
+                    <header class="print-heading">
+                        <div>
+                            <h2>Ordem de serviço #<?php echo (int) $printOrder['id']; ?></h2>
+                            <p><span class="badge <?php echo $printOrder['status'] === 'Faturada' ? 'done' : ($printOrder['status'] === 'Cancelada' ? 'cancelled' : ''); ?>"><?php echo e($printOrder['status']); ?></span></p>
+                        </div>
+                        <div class="small">Emitida em <?php echo e(date('d/m/Y H:i')); ?></div>
+                    </header>
+                    <div class="print-meta">
+                        <section>
+                            <h3>Cliente</h3>
+                            <p><?php echo e($printOrder['client_name']); ?></p>
+                            <p>Telefone: <?php echo e($printOrder['client_phone'] ?: '—'); ?></p>
+                            <p>E-mail: <?php echo e($printOrder['client_email'] ?: '—'); ?></p>
+                        </section>
+                        <section>
+                            <h3>Motocicleta</h3>
+                            <p><?php echo e($printOrder['brand'] . ' ' . $printOrder['model']); ?></p>
+                            <p>Placa: <?php echo e($printOrder['plate']); ?> · Ano: <?php echo e($printOrder['year'] ?: '—'); ?></p>
+                            <p>Quilometragem: <?php echo number_format((int) $printOrder['mileage'], 0, ',', '.'); ?> km</p>
+                        </section>
+                        <section>
+                            <h3>Datas</h3>
+                            <p>Criada: <?php echo e(date('d/m/Y H:i', strtotime($printOrder['created_at']))); ?></p>
+                            <?php if ($printOrder['status'] === 'Faturada' && $printOrder['completed_at']): ?><p>Faturada: <?php echo e(date('d/m/Y H:i', strtotime($printOrder['completed_at']))); ?></p><?php endif; ?>
+                            <?php if ($printOrder['status'] === 'Cancelada' && $printOrder['cancelled_at']): ?><p>Cancelada: <?php echo e(date('d/m/Y H:i', strtotime($printOrder['cancelled_at']))); ?></p><?php endif; ?>
+                        </section>
+                    </div>
+                    <section class="print-section">
+                        <h3>Serviços executados</h3>
+                        <p><?php echo nl2br(e($printOrder['services_description'] ?: '—')); ?></p>
+                    </section>
+                    <section class="print-section">
+                        <h3>Peças utilizadas</h3>
+                        <?php if ($printOrder['part_items']): ?>
+                            <div class="table-wrap"><table><thead><tr><th>Peça</th><th>Quantidade</th><th>Valor unitário</th><th>Subtotal</th></tr></thead><tbody>
+                                <?php foreach ($printOrder['part_items'] as $partItem): ?>
+                                    <tr><td><?php echo e($partItem['part_name']); ?></td><td><?php echo (int) $partItem['quantity']; ?></td><td><?php echo money($partItem['unit_price_cents']); ?></td><td><?php echo money($partItem['line_total_cents']); ?></td></tr>
+                                <?php endforeach; ?>
+                            </tbody></table></div>
+                        <?php else: ?>
+                            <p><?php echo nl2br(e($printOrder['parts_description'] ?: '—')); ?></p>
+                        <?php endif; ?>
+                    </section>
+                    <section class="print-total">
+                        <p>Peças: <?php echo money($printOrder['parts_cents']); ?></p>
+                        <p>Mão de obra: <?php echo money($printOrder['labor_cents']); ?></p>
+                        <p>Total da OS: <?php echo money($printOrder['total_cents']); ?></p>
+                    </section>
+                </article>
+            <?php endif; ?>
         <?php else: ?>
             <div class="layout">
                 <section class="panel"><h2 class="section-title">Histórico de ordens</h2>
@@ -426,7 +517,7 @@ $partsLocked = $editingOrder && $editing['status'] === 'Cancelada';
                                     <td data-sort="<?php echo e($order['services_description'] . ' ' . $order['parts_description']); ?>"><?php echo e($order['services_description'] ?: 'Sem serviços descritos'); ?><br><span class="small"><?php echo e($order['parts_description'] ?: 'Sem peças descritas'); ?></span></td>
                                     <td data-sort="<?php echo (int) $order['total_cents']; ?>"><span class="small">Peças <?php echo money($order['parts_cents']); ?><br>Mão de obra <?php echo money($order['labor_cents']); ?></span><br><span class="primary"><?php echo money($order['total_cents']); ?></span></td>
                                     <td data-sort="<?php echo e($order['status'] . ' ' . ($order['completed_at'] ?: $order['cancelled_at'] ?: $order['created_at'])); ?>"><span class="badge <?php echo $order['status'] === 'Faturada' ? 'done' : ($order['status'] === 'Cancelada' ? 'cancelled' : ''); ?>"><?php echo e($order['status']); ?></span><br><span class="small">Criada <?php echo e(date('d/m/Y H:i', strtotime($order['created_at']))); ?><br><?php if ($order['status'] === 'Faturada' && $order['completed_at']): ?>Faturada <?php echo e(date('d/m/Y H:i', strtotime($order['completed_at']))); ?><?php elseif ($order['status'] === 'Cancelada' && $order['cancelled_at']): ?>Cancelada <?php echo e(date('d/m/Y H:i', strtotime($order['cancelled_at']))); ?><?php else: ?>Sem término<?php endif; ?></span></td>
-                                    <td><div class="row-actions"><a class="text-button" href="/?page=ordens&amp;edit=<?php echo (int) $order['id']; ?>&amp;q=<?php echo urlencode($search); ?>">Editar</a><?php if ($order['status'] === 'Aberta'): ?><form method="post" onsubmit="return confirm('Confirmar que o pagamento da OS #<?php echo (int) $order['id']; ?> foi recebido?');"><input type="hidden" name="csrf_token" value="<?php echo e($csrf); ?>"><input type="hidden" name="action" value="bill_order"><input type="hidden" name="order_id" value="<?php echo (int) $order['id']; ?>"><input type="hidden" name="return_q" value="<?php echo e($search); ?>"><button class="button secondary" type="submit">Faturar</button></form><form method="post" onsubmit="return confirm('Cancelar a OS #<?php echo (int) $order['id']; ?>?');"><input type="hidden" name="csrf_token" value="<?php echo e($csrf); ?>"><input type="hidden" name="action" value="cancel_order"><input type="hidden" name="order_id" value="<?php echo (int) $order['id']; ?>"><input type="hidden" name="return_q" value="<?php echo e($search); ?>"><button class="button secondary delete-button" type="submit">Cancelar</button></form><?php endif; ?></div></td>
+                                    <td><div class="row-actions"><a class="text-button" href="/?page=imprimir&amp;id=<?php echo (int) $order['id']; ?>" target="_blank" rel="noopener">Imprimir</a><a class="text-button" href="/?page=ordens&amp;edit=<?php echo (int) $order['id']; ?>&amp;q=<?php echo urlencode($search); ?>">Editar</a><?php if ($order['status'] === 'Aberta'): ?><form method="post" onsubmit="return confirm('Confirmar que o pagamento da OS #<?php echo (int) $order['id']; ?> foi recebido?');"><input type="hidden" name="csrf_token" value="<?php echo e($csrf); ?>"><input type="hidden" name="action" value="bill_order"><input type="hidden" name="order_id" value="<?php echo (int) $order['id']; ?>"><input type="hidden" name="return_q" value="<?php echo e($search); ?>"><button class="button secondary" type="submit">Faturar</button></form><form method="post" onsubmit="return confirm('Cancelar a OS #<?php echo (int) $order['id']; ?>?');"><input type="hidden" name="csrf_token" value="<?php echo e($csrf); ?>"><input type="hidden" name="action" value="cancel_order"><input type="hidden" name="order_id" value="<?php echo (int) $order['id']; ?>"><input type="hidden" name="return_q" value="<?php echo e($search); ?>"><button class="button secondary delete-button" type="submit">Cancelar</button></form><?php endif; ?></div></td>
                                 </tr>
                             <?php endforeach; ?>
                         </tbody></table></div>

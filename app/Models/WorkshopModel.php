@@ -231,8 +231,8 @@ class WorkshopModel
 
     public function findOrder($id)
     {
-        $statement = $this->db->prepare('SELECT * FROM work_orders WHERE id = ?');
-        $statement->execute(array($id));
+        $statement = $this->db->prepare('SELECT work_orders.*, clients.name AS client_name, clients.phone AS client_phone, clients.email AS client_email, motorcycles.brand, motorcycles.model, motorcycles.year, motorcycles.plate, motorcycles.mileage FROM work_orders JOIN clients ON clients.id = work_orders.client_id JOIN motorcycles ON motorcycles.id = work_orders.motorcycle_id WHERE work_orders.id = ?');
+            $statement->execute(array($id));
         $order = $statement->fetch();
         if (!$order) {
             return false;

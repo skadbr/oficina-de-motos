@@ -26,6 +26,7 @@ O computador precisa ser Windows x64 e pode precisar do Microsoft Visual C++ Red
 - Cadastro de peças com descrição, quantidade em estoque e preço de venda, incluindo busca, edição e exclusão protegida pelo histórico da OS.
 - Lista de motocicletas com pesquisa, ordenação e paginação local, sem dependências externas ou acesso à internet.
 - Na OS, peças são pesquisadas no estoque, adicionadas com quantidade e preço; o subtotal é calculado e o estoque baixado ao salvar. Cancelar a OS devolve as peças, e saldo insuficiente impede a gravação.
+- O histórico permite abrir cada OS em uma folha de impressão com dados do cliente, moto, serviços, peças, valores, status e datas.
 - Serviços executados são descritos livremente em cada OS; o usuário informa diretamente o valor da mão de obra.
 - Data e hora de término são registradas automaticamente ao faturar ou cancelar a OS.
 - O catálogo de serviços foi substituído por texto livre; nomes de OS antigas são migrados para a descrição. Novos bancos não criam as tabelas do catálogo; bancos existentes mantêm os dados legados sem usá-los.

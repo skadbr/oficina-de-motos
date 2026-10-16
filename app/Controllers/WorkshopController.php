@@ -17,9 +17,11 @@ class WorkshopController
         $error = '';
         $success = isset($_SESSION['success']) ? $_SESSION['success'] : '';
         unset($_SESSION['success']);
-        $pages = array('ordens', 'clientes', 'motos', 'pecas', 'financeiro', 'backup', 'restaurar');
+        $pages = array('ordens', 'clientes', 'motos', 'pecas', 'financeiro', 'backup', 'restaurar', 'imprimir');
         $page = isset($_GET['page']) && in_array($_GET['page'], $pages, true) ? $_GET['page'] : 'ordens';
         $search = trim(isset($_GET['q']) ? $_GET['q'] : '');
+        $printOrderId = filter_var(isset($_GET['id']) ? $_GET['id'] : '', FILTER_VALIDATE_INT);
+        $printOrder = $page === 'imprimir' && $printOrderId ? $this->model->findOrder($printOrderId) : false;
         if ($page === 'backup' && isset($_GET['download'])) {
             $this->sendBackup();
         }
@@ -51,6 +53,7 @@ class WorkshopController
             'motorcycles' => $this->model->motorcycles(),
             'parts' => $this->model->parts(),
             'orders' => $this->model->orders(),
+            'printOrder' => $printOrder,
             'financialReport' => $page === 'financeiro' ? $this->model->financialReport($rangeFrom, $rangeTo) : array('summary' => array(), 'orders' => array()),
             'rangeFromDisplay' => date('d/m/Y', strtotime($rangeFrom)),
             'rangeToDisplay' => date('d/m/Y', strtotime($rangeTo)),
@@ -67,7 +70,7 @@ class WorkshopController
             'csrf' => csrfToken(),
             'todayForInput' => date('d/m/Y'),
             'currentTimeForInput' => date('H:i'),
-            'pageTitles' => array('motos' => 'Motocicletas', 'clientes' => 'Clientes', 'pecas' => 'Peças', 'financeiro' => 'Financeiro', 'ordens' => 'Ordens de serviço', 'backup' => 'Fazer backup', 'restaurar' => 'Restaurar backup')
+            'pageTitles' => array('motos' => 'Motocicletas', 'clientes' => 'Clientes', 'pecas' => 'Peças', 'financeiro' => 'Financeiro', 'ordens' => 'Ordens de serviço', 'backup' => 'Fazer backup', 'restaurar' => 'Restaurar backup', 'imprimir' => 'Imprimir OS')
         );
         extract($data, EXTR_SKIP);
         require dirname(__DIR__) . '/Views/dashboard.php';
