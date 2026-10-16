@@ -141,12 +141,29 @@ foreach ($motorcycles as $motorcycle) {
             <div class="layout">
                 <section class="panel">
                     <h2 class="section-title">Clientes cadastrados</h2>
-                    <form method="get" class="search-form"><input type="hidden" name="page" value="clientes"><input type="search" name="q" value="<?php echo e($search); ?>" placeholder="Buscar por nome, telefone ou e-mail"><button class="button" type="submit">Buscar</button><?php if ($search !== ''): ?><a class="cancel-link" href="/?page=clientes">Limpar</a><?php endif; ?></form>
+                    <div class="datatable-controls">
+                        <label class="datatable-search">Pesquisar<input type="search" id="client-table-search" value="<?php echo e($search); ?>" placeholder="Nome, telefone ou e-mail"></label>
+                        <label class="datatable-length">Mostrar<select id="client-page-size"><option value="10" selected>10</option><option value="25">25</option><option value="50">50</option><option value="100">100</option></select> linhas</label>
+                    </div>
                     <?php if (!$clients): ?><div class="empty">Nenhum cliente cadastrado.</div><?php else: ?>
-                        <div class="table-wrap"><table><thead><tr><th>Nome</th><th>Telefone</th><th>E-mail</th><th><?php echo $clientLinkWizard ? 'Vincular moto' : 'Ações'; ?></th></tr></thead><tbody>
-                            <?php foreach ($clients as $client): ?><tr><td class="primary"><?php echo e($client['name']); ?></td><td><?php echo e($client['phone']); ?></td><td><?php echo e($client['email'] ?: '—'); ?></td><td><?php if ($clientLinkWizard): ?><form method="post"><input type="hidden" name="csrf_token" value="<?php echo e($csrf); ?>"><input type="hidden" name="action" value="link_pending_motorcycle"><input type="hidden" name="client_id" value="<?php echo (int) $client['id']; ?>"><button class="button secondary" type="submit">Vincular</button></form><?php else: ?><div class="row-actions"><a class="text-button" href="/?page=clientes&amp;edit=<?php echo (int) $client['id']; ?>&amp;q=<?php echo urlencode($search); ?>">Editar</a><form method="post" onsubmit="return confirm('Excluir este cliente?');"><input type="hidden" name="csrf_token" value="<?php echo e($csrf); ?>"><input type="hidden" name="action" value="delete_client"><input type="hidden" name="id" value="<?php echo (int) $client['id']; ?>"><input type="hidden" name="return_q" value="<?php echo e($search); ?>"><button class="text-button delete-button" type="submit">Excluir</button></form></div><?php endif; ?></td></tr><?php endforeach; ?>
+                        <div class="table-wrap"><table id="client-table"><thead><tr>
+                            <th aria-sort="none"><button type="button" class="table-sort" data-column="0">Nome <span class="table-sort-indicator" aria-hidden="true"></span></button></th>
+                            <th aria-sort="none"><button type="button" class="table-sort" data-column="1">Telefone <span class="table-sort-indicator" aria-hidden="true"></span></button></th>
+                            <th aria-sort="none"><button type="button" class="table-sort" data-column="2">E-mail <span class="table-sort-indicator" aria-hidden="true"></span></button></th>
+                            <th><?php echo $clientLinkWizard ? 'Vincular moto' : 'Ações'; ?></th>
+                        </tr></thead><tbody>
+                            <?php foreach ($clients as $client): ?>
+                                <tr data-search="<?php echo e($client['name'] . ' ' . $client['phone'] . ' ' . $client['email']); ?>">
+                                    <td class="primary"><?php echo e($client['name']); ?></td>
+                                    <td><?php echo e($client['phone']); ?></td>
+                                    <td><?php echo e($client['email'] ?: '—'); ?></td>
+                                    <td><?php if ($clientLinkWizard): ?><form method="post"><input type="hidden" name="csrf_token" value="<?php echo e($csrf); ?>"><input type="hidden" name="action" value="link_pending_motorcycle"><input type="hidden" name="client_id" value="<?php echo (int) $client['id']; ?>"><button class="button secondary" type="submit">Vincular</button></form><?php else: ?><div class="row-actions"><a class="text-button" href="/?page=clientes&amp;edit=<?php echo (int) $client['id']; ?>&amp;q=<?php echo urlencode($search); ?>">Editar</a><form method="post" onsubmit="return confirm('Excluir este cliente?');"><input type="hidden" name="csrf_token" value="<?php echo e($csrf); ?>"><input type="hidden" name="action" value="delete_client"><input type="hidden" name="id" value="<?php echo (int) $client['id']; ?>"><input type="hidden" name="return_q" value="<?php echo e($search); ?>"><button class="text-button delete-button" type="submit">Excluir</button></form></div><?php endif; ?></td>
+                                </tr>
+                            <?php endforeach; ?>
                         </tbody></table></div>
                     <?php endif; ?>
+                    <div class="datatable-footer"><span id="client-table-info" aria-live="polite"></span><div class="datatable-pagination"><button class="button secondary" type="button" id="client-previous">Anterior</button><span id="client-page-info"></span><button class="button secondary" type="button" id="client-next">Próxima</button></div></div>
+                    <div class="empty" id="client-no-matches" hidden>Nenhum cliente corresponde à pesquisa.</div>
                 </section>
                 <section class="panel">
                     <?php if ($clientLinkWizard): ?>
@@ -300,21 +317,33 @@ foreach ($motorcycles as $motorcycle) {
         <?php else: ?>
             <div class="layout">
                 <section class="panel"><h2 class="section-title">Histórico de ordens</h2>
-                    <form method="get" class="search-form"><input type="hidden" name="page" value="ordens"><input type="search" name="q" value="<?php echo e($search); ?>" placeholder="Buscar OS, cliente, moto, serviço, peça ou status"><button class="button" type="submit">Buscar</button><?php if ($search !== ''): ?><a class="cancel-link" href="/?page=ordens">Limpar</a><?php endif; ?></form>
+                    <div class="datatable-controls">
+                        <label class="datatable-search">Pesquisar<input type="search" id="order-table-search" value="<?php echo e($search); ?>" placeholder="OS, cliente, moto, serviço, peça ou status"></label>
+                        <label class="datatable-length">Mostrar<select id="order-page-size"><option value="10" selected>10</option><option value="25">25</option><option value="50">50</option><option value="100">100</option></select> linhas</label>
+                    </div>
                     <?php if (!$orders): ?><div class="empty"><?php echo $search !== '' ? 'Nenhuma OS corresponde à busca.' : 'Nenhuma OS cadastrada. Crie a primeira ao lado.'; ?></div><?php else: ?>
-                        <div class="table-wrap"><table><thead><tr><th>OS</th><th>Cliente / moto</th><th>Serviços / peças</th><th>Valores</th><th>Status / datas</th><th>Ações</th></tr></thead><tbody>
+                        <div class="table-wrap"><table id="order-table"><thead><tr>
+                            <th aria-sort="none"><button type="button" class="table-sort" data-column="0">OS <span class="table-sort-indicator" aria-hidden="true"></span></button></th>
+                            <th aria-sort="none"><button type="button" class="table-sort" data-column="1">Cliente / moto <span class="table-sort-indicator" aria-hidden="true"></span></button></th>
+                            <th aria-sort="none"><button type="button" class="table-sort" data-column="2">Serviços / peças <span class="table-sort-indicator" aria-hidden="true"></span></button></th>
+                            <th aria-sort="none"><button type="button" class="table-sort" data-column="3">Valores <span class="table-sort-indicator" aria-hidden="true"></span></button></th>
+                            <th aria-sort="none"><button type="button" class="table-sort" data-column="4">Status / datas <span class="table-sort-indicator" aria-hidden="true"></span></button></th>
+                            <th>Ações</th>
+                        </tr></thead><tbody>
                             <?php foreach ($orders as $order): ?>
-                                <tr>
-                                    <td class="primary">#<?php echo (int) $order['id']; ?></td>
-                                    <td><span class="primary"><?php echo e($order['client_name']); ?></span><br><span class="small"><?php echo e($order['brand'] . ' ' . $order['model'] . ' · ' . $order['plate']); ?></span></td>
-                                    <td><?php echo e($order['services_description'] ?: 'Sem serviços descritos'); ?><br><span class="small"><?php echo e($order['parts_description'] ?: 'Sem peças descritas'); ?></span></td>
-                                    <td><span class="small">Peças <?php echo money($order['parts_cents']); ?><br>Mão de obra <?php echo money($order['labor_cents']); ?></span><br><span class="primary"><?php echo money($order['total_cents']); ?></span></td>
-                                    <td><span class="badge <?php echo $order['status'] === 'Faturada' ? 'done' : ($order['status'] === 'Cancelada' ? 'cancelled' : ''); ?>"><?php echo e($order['status']); ?></span><br><span class="small">Criada <?php echo e(date('d/m/Y H:i', strtotime($order['created_at']))); ?><br><?php if ($order['status'] === 'Faturada' && $order['completed_at']): ?>Faturada <?php echo e(date('d/m/Y H:i', strtotime($order['completed_at']))); ?><?php elseif ($order['status'] === 'Cancelada' && $order['cancelled_at']): ?>Cancelada <?php echo e(date('d/m/Y H:i', strtotime($order['cancelled_at']))); ?><?php else: ?>Sem término<?php endif; ?></span></td>
+                                <tr data-search="<?php echo e($order['id'] . ' ' . $order['client_name'] . ' ' . $order['brand'] . ' ' . $order['model'] . ' ' . $order['plate'] . ' ' . $order['services_description'] . ' ' . $order['parts_description'] . ' ' . $order['status'] . ' ' . $order['created_at'] . ' ' . $order['completed_at'] . ' ' . $order['cancelled_at']); ?>">
+                                    <td class="primary" data-sort="<?php echo (int) $order['id']; ?>">#<?php echo (int) $order['id']; ?></td>
+                                    <td data-sort="<?php echo e($order['client_name'] . ' ' . $order['brand'] . ' ' . $order['model'] . ' ' . $order['plate']); ?>"><span class="primary"><?php echo e($order['client_name']); ?></span><br><span class="small"><?php echo e($order['brand'] . ' ' . $order['model'] . ' · ' . $order['plate']); ?></span></td>
+                                    <td data-sort="<?php echo e($order['services_description'] . ' ' . $order['parts_description']); ?>"><?php echo e($order['services_description'] ?: 'Sem serviços descritos'); ?><br><span class="small"><?php echo e($order['parts_description'] ?: 'Sem peças descritas'); ?></span></td>
+                                    <td data-sort="<?php echo (int) $order['total_cents']; ?>"><span class="small">Peças <?php echo money($order['parts_cents']); ?><br>Mão de obra <?php echo money($order['labor_cents']); ?></span><br><span class="primary"><?php echo money($order['total_cents']); ?></span></td>
+                                    <td data-sort="<?php echo e($order['status'] . ' ' . ($order['completed_at'] ?: $order['cancelled_at'] ?: $order['created_at'])); ?>"><span class="badge <?php echo $order['status'] === 'Faturada' ? 'done' : ($order['status'] === 'Cancelada' ? 'cancelled' : ''); ?>"><?php echo e($order['status']); ?></span><br><span class="small">Criada <?php echo e(date('d/m/Y H:i', strtotime($order['created_at']))); ?><br><?php if ($order['status'] === 'Faturada' && $order['completed_at']): ?>Faturada <?php echo e(date('d/m/Y H:i', strtotime($order['completed_at']))); ?><?php elseif ($order['status'] === 'Cancelada' && $order['cancelled_at']): ?>Cancelada <?php echo e(date('d/m/Y H:i', strtotime($order['cancelled_at']))); ?><?php else: ?>Sem término<?php endif; ?></span></td>
                                     <td><div class="row-actions"><a class="text-button" href="/?page=ordens&amp;edit=<?php echo (int) $order['id']; ?>&amp;q=<?php echo urlencode($search); ?>">Editar</a><?php if ($order['status'] === 'Aberta'): ?><form method="post" onsubmit="return confirm('Confirmar que o pagamento da OS #<?php echo (int) $order['id']; ?> foi recebido?');"><input type="hidden" name="csrf_token" value="<?php echo e($csrf); ?>"><input type="hidden" name="action" value="bill_order"><input type="hidden" name="order_id" value="<?php echo (int) $order['id']; ?>"><input type="hidden" name="return_q" value="<?php echo e($search); ?>"><button class="button secondary" type="submit">Faturar</button></form><form method="post" onsubmit="return confirm('Cancelar a OS #<?php echo (int) $order['id']; ?>?');"><input type="hidden" name="csrf_token" value="<?php echo e($csrf); ?>"><input type="hidden" name="action" value="cancel_order"><input type="hidden" name="order_id" value="<?php echo (int) $order['id']; ?>"><input type="hidden" name="return_q" value="<?php echo e($search); ?>"><button class="button secondary delete-button" type="submit">Cancelar</button></form><?php endif; ?></div></td>
                                 </tr>
                             <?php endforeach; ?>
                         </tbody></table></div>
                     <?php endif; ?>
+                    <div class="datatable-footer"><span id="order-table-info" aria-live="polite"></span><div class="datatable-pagination"><button class="button secondary" type="button" id="order-previous">Anterior</button><span id="order-page-info"></span><button class="button secondary" type="button" id="order-next">Próxima</button></div></div>
+                    <div class="empty" id="order-no-matches" hidden>Nenhuma OS corresponde à pesquisa.</div>
                 </section>
                 <section class="panel"><h2 class="section-title"><?php echo $editing ? 'Editar OS #' . (int) $editing['id'] : 'Nova ordem de serviço'; ?></h2>
                     <?php if (!$motorcycles): ?><div class="form-hint">Ainda não há motos cadastradas. Use Novo para cadastrar a moto desta OS.</div><?php endif; ?>
@@ -446,92 +475,94 @@ foreach ($motorcycles as $motorcycle) {
 </script>
 <script>
 (function () {
-    var table = document.getElementById('motorcycle-table');
-    var searchInput = document.getElementById('motorcycle-table-search');
-    var pageSizeSelect = document.getElementById('motorcycle-page-size');
-    var info = document.getElementById('motorcycle-table-info');
-    var pageInfo = document.getElementById('motorcycle-page-info');
-    var previousButton = document.getElementById('motorcycle-previous');
-    var nextButton = document.getElementById('motorcycle-next');
-    var noMatches = document.getElementById('motorcycle-no-matches');
-    if (!searchInput || !pageSizeSelect || !info || !pageInfo || !previousButton || !nextButton || !noMatches) return;
-    if (!table) {
-        info.textContent = 'Nenhuma motocicleta cadastrada';
-        pageInfo.textContent = 'Página 0 de 0';
-        previousButton.disabled = true;
-        nextButton.disabled = true;
-        return;
-    }
-
-    var tableWrap = table.closest('.table-wrap');
-    var rows = Array.prototype.slice.call(table.tBodies[0].rows);
-    var sortColumn = -1;
-    var sortDirection = 1;
-    var currentPage = 0;
-    var collator = new Intl.Collator('pt-BR', { numeric: true, sensitivity: 'base' });
-
-    var renderTable = function () {
-        var query = searchInput.value.trim().toLocaleLowerCase();
-        var matchingRows = rows.filter(function (row) {
-            return (row.getAttribute('data-search') || '').toLocaleLowerCase().indexOf(query) !== -1;
-        });
-        if (sortColumn >= 0) {
-            matchingRows.sort(function (left, right) {
-                var leftText = left.cells[sortColumn].textContent.trim();
-                var rightText = right.cells[sortColumn].textContent.trim();
-                return collator.compare(leftText, rightText) * sortDirection;
-            });
+    var setupDataTable = function (prefix, rowLabel, emptyLabel) {
+        var table = document.getElementById(prefix + '-table');
+        var searchInput = document.getElementById(prefix + '-table-search');
+        var pageSizeSelect = document.getElementById(prefix + '-page-size');
+        var info = document.getElementById(prefix + '-table-info');
+        var pageInfo = document.getElementById(prefix + '-page-info');
+        var previousButton = document.getElementById(prefix + '-previous');
+        var nextButton = document.getElementById(prefix + '-next');
+        var noMatches = document.getElementById(prefix + '-no-matches');
+        if (!searchInput || !pageSizeSelect || !info || !pageInfo || !previousButton || !nextButton || !noMatches) return;
+        if (!table) {
+            info.textContent = emptyLabel;
+            pageInfo.textContent = 'Página 0 de 0';
+            previousButton.disabled = true;
+            nextButton.disabled = true;
+            return;
         }
 
-        var pageSize = parseInt(pageSizeSelect.value, 10) || 10;
-        var pageCount = Math.ceil(matchingRows.length / pageSize);
-        currentPage = Math.min(currentPage, Math.max(0, pageCount - 1));
-        var first = currentPage * pageSize;
-        var visibleRows = matchingRows.slice(first, first + pageSize);
-        matchingRows.forEach(function (row) { table.tBodies[0].appendChild(row); });
-        rows.forEach(function (row) { row.hidden = visibleRows.indexOf(row) === -1; });
-
-        tableWrap.hidden = matchingRows.length === 0;
-        noMatches.hidden = matchingRows.length !== 0;
-        info.textContent = matchingRows.length
-            ? 'Mostrando ' + (first + 1) + ' a ' + (first + visibleRows.length) + ' de ' + matchingRows.length + ' motocicletas'
-            : 'Nenhuma motocicleta encontrada';
-        pageInfo.textContent = pageCount ? 'Página ' + (currentPage + 1) + ' de ' + pageCount : 'Página 0 de 0';
-        previousButton.disabled = currentPage === 0 || pageCount === 0;
-        nextButton.disabled = currentPage >= pageCount - 1 || pageCount === 0;
-
-        rows.forEach(function (row) {
-            var editLink = row.querySelector('a.text-button');
-            var returnSearch = row.querySelector('input[name="return_q"]');
-            if (editLink) {
-                var url = new URL(editLink.href);
-                if (query) url.searchParams.set('q', searchInput.value.trim());
-                else url.searchParams.delete('q');
-                editLink.href = url.toString();
+        var tableWrap = table.closest('.table-wrap');
+        var rows = Array.prototype.slice.call(table.tBodies[0].rows);
+        var sortColumn = -1;
+        var sortDirection = 1;
+        var currentPage = 0;
+        var renderTable = function () {
+            var query = searchInput.value.trim().toLocaleLowerCase();
+            var matchingRows = rows.filter(function (row) {
+                return (row.getAttribute('data-search') || '').toLocaleLowerCase().indexOf(query) !== -1;
+            });
+            if (sortColumn >= 0) {
+                matchingRows.sort(function (left, right) {
+                    var leftText = left.cells[sortColumn].textContent.trim();
+                    var rightText = right.cells[sortColumn].textContent.trim();
+                    return leftText.localeCompare(rightText, 'pt-BR', { numeric: true, sensitivity: 'base' }) * sortDirection;
+                });
             }
-            if (returnSearch) returnSearch.value = searchInput.value.trim();
+
+            var pageSize = parseInt(pageSizeSelect.value, 10) || 10;
+            var pageCount = Math.ceil(matchingRows.length / pageSize);
+            currentPage = Math.min(currentPage, Math.max(0, pageCount - 1));
+            var first = currentPage * pageSize;
+            var visibleRows = matchingRows.slice(first, first + pageSize);
+            matchingRows.forEach(function (row) { table.tBodies[0].appendChild(row); });
+            rows.forEach(function (row) { row.hidden = visibleRows.indexOf(row) === -1; });
+
+            tableWrap.hidden = matchingRows.length === 0;
+            noMatches.hidden = matchingRows.length !== 0;
+            info.textContent = matchingRows.length
+                ? 'Mostrando ' + (first + 1) + ' a ' + (first + visibleRows.length) + ' de ' + matchingRows.length + ' ' + rowLabel
+                : 'Nenhum registro encontrado';
+            pageInfo.textContent = pageCount ? 'Página ' + (currentPage + 1) + ' de ' + pageCount : 'Página 0 de 0';
+            previousButton.disabled = currentPage === 0 || pageCount === 0;
+            nextButton.disabled = currentPage >= pageCount - 1 || pageCount === 0;
+
+            rows.forEach(function (row) {
+                var editLink = row.querySelector('a.text-button');
+                var returnSearch = row.querySelector('input[name="return_q"]');
+                if (editLink) {
+                    var editPath = editLink.href.split('&q=')[0];
+                    editLink.href = query ? editPath + '&q=' + encodeURIComponent(searchInput.value.trim()) : editPath;
+                }
+                if (returnSearch) returnSearch.value = searchInput.value.trim();
+            });
+        };
+
+        table.querySelectorAll('.table-sort').forEach(function (button) {
+            button.addEventListener('click', function () {
+                var column = parseInt(button.getAttribute('data-column'), 10);
+                sortDirection = sortColumn === column ? sortDirection * -1 : 1;
+                sortColumn = column;
+                table.querySelectorAll('.table-sort').forEach(function (otherButton) {
+                    var active = otherButton === button;
+                    otherButton.parentElement.setAttribute('aria-sort', active ? (sortDirection === 1 ? 'ascending' : 'descending') : 'none');
+                    otherButton.querySelector('.table-sort-indicator').textContent = active ? (sortDirection === 1 ? '▲' : '▼') : '';
+                });
+                currentPage = 0;
+                renderTable();
+            });
         });
+        searchInput.addEventListener('input', function () { currentPage = 0; renderTable(); });
+        pageSizeSelect.addEventListener('change', function () { currentPage = 0; renderTable(); });
+        previousButton.addEventListener('click', function () { currentPage--; renderTable(); });
+        nextButton.addEventListener('click', function () { currentPage++; renderTable(); });
+        renderTable();
     };
 
-    table.querySelectorAll('.table-sort').forEach(function (button) {
-        button.addEventListener('click', function () {
-            var column = parseInt(button.getAttribute('data-column'), 10);
-            sortDirection = sortColumn === column ? sortDirection * -1 : 1;
-            sortColumn = column;
-            table.querySelectorAll('.table-sort').forEach(function (otherButton) {
-                var active = otherButton === button;
-                otherButton.parentElement.setAttribute('aria-sort', active ? (sortDirection === 1 ? 'ascending' : 'descending') : 'none');
-                otherButton.querySelector('.table-sort-indicator').textContent = active ? (sortDirection === 1 ? '▲' : '▼') : '';
-            });
-            currentPage = 0;
-            renderTable();
-        });
-    });
-    searchInput.addEventListener('input', function () { currentPage = 0; renderTable(); });
-    pageSizeSelect.addEventListener('change', function () { currentPage = 0; renderTable(); });
-    previousButton.addEventListener('click', function () { currentPage--; renderTable(); });
-    nextButton.addEventListener('click', function () { currentPage++; renderTable(); });
-    renderTable();
+    setupDataTable('client', 'clientes', 'Nenhum cliente cadastrado');
+    setupDataTable('motorcycle', 'motocicletas', 'Nenhuma motocicleta cadastrada');
+    setupDataTable('order', 'ordens de serviço', 'Nenhuma ordem de serviço cadastrada');
 }());
 </script>
 <script>
