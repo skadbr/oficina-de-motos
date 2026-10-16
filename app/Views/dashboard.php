@@ -22,7 +22,7 @@
 /** @var string $rangeFrom */
 /** @var string $rangeTo */
 $title = $pageTitles[$page];
-$activeMotorcycleId = $editing ? (int) $editing['motorcycle_id'] : (int) $selectedMotorcycleId;
+$activeMotorcycleId = $page === 'ordens' && $editing ? (int) $editing['motorcycle_id'] : (int) $selectedMotorcycleId;
 $activeMotorcycle = null;
 foreach ($motorcycles as $motorcycle) {
     if ((int) $motorcycle['id'] === $activeMotorcycleId) {
@@ -59,6 +59,16 @@ foreach ($motorcycles as $motorcycle) {
         .section-title { margin: 0 0 13px; font-size: 16px; }
         .panel { background: var(--white); border: 1px solid var(--line); border-radius: 5px; padding: 20px; }
         .table-wrap { overflow-x: auto; }
+        .datatable-controls, .datatable-footer { display: flex; align-items: end; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+        .datatable-controls { margin-bottom: 14px; }
+        .datatable-search { width: min(100%, 380px); }
+        .datatable-length { display: flex; align-items: center; gap: 8px; color: var(--muted); font-size: 13px; }
+        .datatable-length select { width: auto; min-width: 72px; }
+        .table-sort { display: inline-flex; align-items: center; gap: 6px; padding: 0; border: 0; background: transparent; color: inherit; font: inherit; font-weight: inherit; text-align: left; text-transform: inherit; cursor: pointer; }
+        .table-sort:hover { color: var(--green-dark); }
+        .table-sort-indicator { color: var(--green); }
+        .datatable-footer { align-items: center; margin-top: 14px; color: var(--muted); font-size: 13px; }
+        .datatable-pagination { display: flex; align-items: center; gap: 9px; }
         table { width: 100%; border-collapse: collapse; text-align: left; }
         th { padding: 10px 12px; color: var(--muted); font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .6px; border-bottom: 1px solid var(--line); white-space: nowrap; }
         td { padding: 13px 12px; border-bottom: 1px solid #edf0eb; vertical-align: top; }
@@ -172,12 +182,31 @@ foreach ($motorcycles as $motorcycle) {
         <?php elseif ($page === 'motos'): ?>
             <div class="layout">
                 <section class="panel"><h2 class="section-title">Motocicletas cadastradas</h2>
-                    <form method="get" class="search-form"><input type="hidden" name="page" value="motos"><input type="search" name="q" value="<?php echo e($search); ?>" placeholder="Buscar por marca, modelo, placa ou cliente"><button class="button" type="submit">Buscar</button><?php if ($search !== ''): ?><a class="cancel-link" href="/?page=motos">Limpar</a><?php endif; ?></form>
+                    <div class="datatable-controls">
+                        <label class="datatable-search">Pesquisar<input type="search" id="motorcycle-table-search" value="<?php echo e($search); ?>" placeholder="Marca, modelo, placa ou cliente"></label>
+                        <label class="datatable-length">Mostrar<select id="motorcycle-page-size"><option value="10" selected>10</option><option value="25">25</option><option value="50">50</option><option value="100">100</option></select> linhas</label>
+                    </div>
                     <?php if (!$motorcycles): ?><div class="empty">Nenhuma moto cadastrada.</div><?php else: ?>
-                        <div class="table-wrap"><table><thead><tr><th>Moto</th><th>Placa</th><th>Cliente</th><th>Ano / km</th><th>Ações</th></tr></thead><tbody>
-                            <?php foreach ($motorcycles as $motorcycle): ?><tr><td class="primary"><?php echo e($motorcycle['brand'] . ' ' . $motorcycle['model']); ?></td><td><?php echo e($motorcycle['plate']); ?></td><td><?php echo e($motorcycle['client_name']); ?></td><td><?php echo e($motorcycle['year'] ?: '—'); ?> / <?php echo number_format((int) $motorcycle['mileage'], 0, ',', '.'); ?> km</td><td><div class="row-actions"><a class="text-button" href="/?page=motos&amp;edit=<?php echo (int) $motorcycle['id']; ?>&amp;q=<?php echo urlencode($search); ?>">Editar</a><form method="post" onsubmit="return confirm('Excluir esta motocicleta?');"><input type="hidden" name="csrf_token" value="<?php echo e($csrf); ?>"><input type="hidden" name="action" value="delete_motorcycle"><input type="hidden" name="id" value="<?php echo (int) $motorcycle['id']; ?>"><input type="hidden" name="return_q" value="<?php echo e($search); ?>"><button class="text-button delete-button" type="submit">Excluir</button></form></div></td></tr><?php endforeach; ?>
+                        <div class="table-wrap"><table id="motorcycle-table"><thead><tr>
+                            <th aria-sort="none"><button type="button" class="table-sort" data-column="0">Moto <span class="table-sort-indicator" aria-hidden="true"></span></button></th>
+                            <th aria-sort="none"><button type="button" class="table-sort" data-column="1">Placa <span class="table-sort-indicator" aria-hidden="true"></span></button></th>
+                            <th aria-sort="none"><button type="button" class="table-sort" data-column="2">Cliente <span class="table-sort-indicator" aria-hidden="true"></span></button></th>
+                            <th aria-sort="none"><button type="button" class="table-sort" data-column="3">Ano / km <span class="table-sort-indicator" aria-hidden="true"></span></button></th>
+                            <th>Ações</th>
+                        </tr></thead><tbody>
+                            <?php foreach ($motorcycles as $motorcycle): ?>
+                                <tr data-search="<?php echo e($motorcycle['brand'] . ' ' . $motorcycle['model'] . ' ' . $motorcycle['plate'] . ' ' . $motorcycle['client_name'] . ' ' . $motorcycle['year'] . ' ' . $motorcycle['mileage']); ?>">
+                                    <td class="primary"><?php echo e($motorcycle['brand'] . ' ' . $motorcycle['model']); ?></td>
+                                    <td><?php echo e($motorcycle['plate']); ?></td>
+                                    <td><?php echo e($motorcycle['client_name']); ?></td>
+                                    <td><?php echo e($motorcycle['year'] ?: '—'); ?> / <?php echo number_format((int) $motorcycle['mileage'], 0, ',', '.'); ?> km</td>
+                                    <td><div class="row-actions"><a class="text-button" href="/?page=motos&amp;edit=<?php echo (int) $motorcycle['id']; ?>&amp;q=<?php echo urlencode($search); ?>">Editar</a><form method="post" onsubmit="return confirm('Excluir esta motocicleta?');"><input type="hidden" name="csrf_token" value="<?php echo e($csrf); ?>"><input type="hidden" name="action" value="delete_motorcycle"><input type="hidden" name="id" value="<?php echo (int) $motorcycle['id']; ?>"><input type="hidden" name="return_q" value="<?php echo e($search); ?>"><button class="text-button delete-button" type="submit">Excluir</button></form></div></td>
+                                </tr>
+                            <?php endforeach; ?>
                         </tbody></table></div>
                     <?php endif; ?>
+                    <div class="datatable-footer"><span id="motorcycle-table-info" aria-live="polite"></span><div class="datatable-pagination"><button class="button secondary" type="button" id="motorcycle-previous">Anterior</button><span id="motorcycle-page-info"></span><button class="button secondary" type="button" id="motorcycle-next">Próxima</button></div></div>
+                    <div class="empty" id="motorcycle-no-matches" hidden>Nenhuma moto corresponde à pesquisa.</div>
                 </section>
                 <section class="panel"><h2 class="section-title"><?php echo $motorcycleWizard ? 'Nova moto para a OS' : ($editing ? 'Editar motocicleta' : 'Nova motocicleta'); ?></h2>
                     <?php if ($motorcycleWizard): ?>
@@ -413,6 +442,96 @@ foreach ($motorcycles as $motorcycle) {
             motorcycleSearch.reportValidity();
         }
     });
+}());
+</script>
+<script>
+(function () {
+    var table = document.getElementById('motorcycle-table');
+    var searchInput = document.getElementById('motorcycle-table-search');
+    var pageSizeSelect = document.getElementById('motorcycle-page-size');
+    var info = document.getElementById('motorcycle-table-info');
+    var pageInfo = document.getElementById('motorcycle-page-info');
+    var previousButton = document.getElementById('motorcycle-previous');
+    var nextButton = document.getElementById('motorcycle-next');
+    var noMatches = document.getElementById('motorcycle-no-matches');
+    if (!searchInput || !pageSizeSelect || !info || !pageInfo || !previousButton || !nextButton || !noMatches) return;
+    if (!table) {
+        info.textContent = 'Nenhuma motocicleta cadastrada';
+        pageInfo.textContent = 'Página 0 de 0';
+        previousButton.disabled = true;
+        nextButton.disabled = true;
+        return;
+    }
+
+    var tableWrap = table.closest('.table-wrap');
+    var rows = Array.prototype.slice.call(table.tBodies[0].rows);
+    var sortColumn = -1;
+    var sortDirection = 1;
+    var currentPage = 0;
+    var collator = new Intl.Collator('pt-BR', { numeric: true, sensitivity: 'base' });
+
+    var renderTable = function () {
+        var query = searchInput.value.trim().toLocaleLowerCase();
+        var matchingRows = rows.filter(function (row) {
+            return (row.getAttribute('data-search') || '').toLocaleLowerCase().indexOf(query) !== -1;
+        });
+        if (sortColumn >= 0) {
+            matchingRows.sort(function (left, right) {
+                var leftText = left.cells[sortColumn].textContent.trim();
+                var rightText = right.cells[sortColumn].textContent.trim();
+                return collator.compare(leftText, rightText) * sortDirection;
+            });
+        }
+
+        var pageSize = parseInt(pageSizeSelect.value, 10) || 10;
+        var pageCount = Math.ceil(matchingRows.length / pageSize);
+        currentPage = Math.min(currentPage, Math.max(0, pageCount - 1));
+        var first = currentPage * pageSize;
+        var visibleRows = matchingRows.slice(first, first + pageSize);
+        matchingRows.forEach(function (row) { table.tBodies[0].appendChild(row); });
+        rows.forEach(function (row) { row.hidden = visibleRows.indexOf(row) === -1; });
+
+        tableWrap.hidden = matchingRows.length === 0;
+        noMatches.hidden = matchingRows.length !== 0;
+        info.textContent = matchingRows.length
+            ? 'Mostrando ' + (first + 1) + ' a ' + (first + visibleRows.length) + ' de ' + matchingRows.length + ' motocicletas'
+            : 'Nenhuma motocicleta encontrada';
+        pageInfo.textContent = pageCount ? 'Página ' + (currentPage + 1) + ' de ' + pageCount : 'Página 0 de 0';
+        previousButton.disabled = currentPage === 0 || pageCount === 0;
+        nextButton.disabled = currentPage >= pageCount - 1 || pageCount === 0;
+
+        rows.forEach(function (row) {
+            var editLink = row.querySelector('a.text-button');
+            var returnSearch = row.querySelector('input[name="return_q"]');
+            if (editLink) {
+                var url = new URL(editLink.href);
+                if (query) url.searchParams.set('q', searchInput.value.trim());
+                else url.searchParams.delete('q');
+                editLink.href = url.toString();
+            }
+            if (returnSearch) returnSearch.value = searchInput.value.trim();
+        });
+    };
+
+    table.querySelectorAll('.table-sort').forEach(function (button) {
+        button.addEventListener('click', function () {
+            var column = parseInt(button.getAttribute('data-column'), 10);
+            sortDirection = sortColumn === column ? sortDirection * -1 : 1;
+            sortColumn = column;
+            table.querySelectorAll('.table-sort').forEach(function (otherButton) {
+                var active = otherButton === button;
+                otherButton.parentElement.setAttribute('aria-sort', active ? (sortDirection === 1 ? 'ascending' : 'descending') : 'none');
+                otherButton.querySelector('.table-sort-indicator').textContent = active ? (sortDirection === 1 ? '▲' : '▼') : '';
+            });
+            currentPage = 0;
+            renderTable();
+        });
+    });
+    searchInput.addEventListener('input', function () { currentPage = 0; renderTable(); });
+    pageSizeSelect.addEventListener('change', function () { currentPage = 0; renderTable(); });
+    previousButton.addEventListener('click', function () { currentPage--; renderTable(); });
+    nextButton.addEventListener('click', function () { currentPage++; renderTable(); });
+    renderTable();
 }());
 </script>
 <script>

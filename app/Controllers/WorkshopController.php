@@ -48,7 +48,7 @@ class WorkshopController
 
         $data = array(
             'clients' => $this->model->clients($page === 'clientes' ? $search : ''),
-            'motorcycles' => $this->model->motorcycles($page === 'motos' ? $search : ''),
+            'motorcycles' => $this->model->motorcycles(),
             'orders' => $this->model->orders($page === 'ordens' ? $search : ''),
             'financialReport' => $page === 'financeiro' ? $this->model->financialReport($rangeFrom, $rangeTo) : array('summary' => array(), 'orders' => array()),
             'rangeFromDisplay' => date('d/m/Y', strtotime($rangeFrom)),

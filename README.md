@@ -23,6 +23,7 @@ O computador precisa ser Windows x64 e pode precisar do Microsoft Visual C++ Red
 ## Funcionalidades
 
 - Cadastro e edição de clientes e motocicletas, com OS vinculadas.
+- Lista de motocicletas com pesquisa, ordenação e paginação local, sem dependências externas ou acesso à internet.
 - Serviços executados são descritos livremente em cada OS; o usuário informa diretamente o valor da mão de obra e das peças.
 - Data e hora de término são registradas automaticamente ao faturar ou cancelar a OS.
 - O catálogo de serviços foi substituído por texto livre; nomes de OS antigas são migrados para a descrição. Novos bancos não criam as tabelas do catálogo; bancos existentes mantêm os dados legados sem usá-los.
