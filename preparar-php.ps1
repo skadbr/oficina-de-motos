@@ -4,6 +4,21 @@ $ErrorActionPreference = 'Stop'
 $runtimePath = Join-Path $ProjectRoot 'runtime\php'
 $phpPath = Join-Path $runtimePath 'php.exe'
 
+$envPath = Join-Path $ProjectRoot '.env'
+$currentName = ''
+if (Test-Path $envPath) {
+    $line = Get-Content -Path $envPath -Encoding UTF8 | Where-Object { $_ -match '^\s*WORKSHOP_NAME\s*=' } | Select-Object -First 1
+    if ($line) { $currentName = ($line -replace '^\s*WORKSHOP_NAME\s*=\s*', '').Trim().Trim('"') }
+}
+$prompt = 'Digite o nome da oficina'
+if ($currentName) { $prompt += " (Enter para manter '$currentName')" }
+$workshopName = (Read-Host $prompt).Trim() -replace '["\r\n]', ''
+if (-not $workshopName) { $workshopName = $currentName }
+if ($workshopName) {
+    [IO.File]::WriteAllText($envPath, "WORKSHOP_NAME=`"$workshopName`"`r`n", (New-Object Text.UTF8Encoding($false)))
+    Write-Host "Nome da oficina gravado em .env: $workshopName"
+}
+
 if (Test-Path $phpPath) {
     Write-Host 'PHP portatil ja esta instalado.'
     exit 0

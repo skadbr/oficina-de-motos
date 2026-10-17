@@ -24,6 +24,12 @@
 /** @var string $rangeFrom */
 /** @var string $rangeTo */
 $title = $pageTitles[$page];
+$documentTitle = $title . ' | Oficina';
+if ($page === 'imprimir' && $printOrder) {
+    $firstName = preg_split('/\s+/u', trim((string) $printOrder['client_name']))[0];
+    $firstName = trim(preg_replace('/[\\\\\/:*?"<>|]+/u', '', $firstName));
+    $documentTitle = 'OS_#' . (int) $printOrder['id'] . ($firstName !== '' ? '_' . $firstName : '');
+}
 $activeMotorcycleId = $page === 'ordens' && $editing ? (int) $editing['motorcycle_id'] : (int) $selectedMotorcycleId;
 $activeMotorcycle = null;
 foreach ($motorcycles as $motorcycle) {
@@ -85,7 +91,7 @@ $partsLocked = $editingOrder && $editing['status'] === 'Cancelada';
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title><?php echo e($title); ?> | Oficina</title>
+    <title><?php echo e($documentTitle); ?></title>
     <style>
         :root { --ink: #202725; --muted: #68716d; --paper: #f4f5f0; --white: #fff; --line: #dfe3dc; --green: #236b51; --green-dark: #174936; --pale: #e8efe9; --red: #a83d32; }
         * { box-sizing: border-box; }
@@ -171,6 +177,7 @@ $partsLocked = $editingOrder && $editing['status'] === 'Cancelada';
         .print-sheet { max-width: 900px; margin: 0 auto; padding: 30px; background: #fff; border: 1px solid var(--line); }
         .print-heading { display: flex; align-items: start; justify-content: space-between; gap: 20px; padding-bottom: 18px; border-bottom: 2px solid var(--ink); }
         .print-heading h2 { margin: 0; font-size: 23px; }
+        .print-workshop { margin: 0 0 6px; font-size: 20px; font-weight: 700; text-transform: uppercase; }
         .print-meta { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; padding: 18px 0; }
         .print-meta h3, .print-section h3 { margin: 0 0 8px; font-size: 14px; }
         .print-meta p { margin: 3px 0; }
@@ -197,7 +204,7 @@ $partsLocked = $editingOrder && $editing['status'] === 'Cancelada';
 <body class="<?php echo $page === 'imprimir' ? 'print-page' : ''; ?>">
 <div class="shell">
     <aside>
-        <p class="brand">Oficina <span>MOTO RACING</span></p>
+        <p class="brand">Oficina<?php if (workshopName() !== ''): ?> <span><?php echo e(workshopName()); ?></span><?php endif; ?></p>
         <nav aria-label="Navegação principal">
             <?php foreach (array('clientes', 'motos', 'pecas', 'ordens') as $key): ?>
                 <?php $pageTitle = $pageTitles[$key]; ?>
@@ -441,11 +448,12 @@ $partsLocked = $editingOrder && $editing['status'] === 'Cancelada';
             <?php else: ?>
                 <div class="print-actions no-print">
                     <button class="button" type="button" onclick="window.print()">Imprimir OS</button>
-                    <a class="button secondary" href="/?page=ordens">Voltar</a>
+                    <button class="button secondary" type="button" onclick="window.close()">Fechar</button>
                 </div>
                 <article class="print-sheet">
                     <header class="print-heading">
                         <div>
+                            <?php if (workshopName() !== ''): ?><p class="print-workshop"><?php echo e(workshopName()); ?></p><?php endif; ?>
                             <h2>Ordem de serviço #<?php echo (int) $printOrder['id']; ?></h2>
                             <p><span class="badge <?php echo $printOrder['status'] === 'Faturada' ? 'done' : ($printOrder['status'] === 'Cancelada' ? 'cancelled' : ''); ?>"><?php echo e($printOrder['status']); ?></span></p>
                         </div>

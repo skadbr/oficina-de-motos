@@ -4,6 +4,26 @@ function e($value)
     return htmlspecialchars((string) $value, ENT_QUOTES, 'UTF-8');
 }
 
+function workshopName()
+{
+    static $name = null;
+    if ($name !== null) {
+        return $name;
+    }
+    $name = '';
+    $file = dirname(__DIR__) . '/.env';
+    if (is_file($file)) {
+        foreach (file($file, FILE_IGNORE_NEW_LINES) as $line) {
+            $line = preg_replace('/^\xEF\xBB\xBF/', '', trim($line));
+            if (preg_match('/^WORKSHOP_NAME\s*=\s*(.*)$/', $line, $match)) {
+                $name = trim(trim($match[1]), "\"'");
+                break;
+            }
+        }
+    }
+    return $name;
+}
+
 function moneyToCents($value)
 {
     $value = trim((string) $value);
