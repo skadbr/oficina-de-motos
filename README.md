@@ -1,8 +1,8 @@
-# Oficina de motos
+# Sistema Portável para Oficina de motos
 
 Sistema em PHP puro, organizado em MVC, com SQLite. O banco fica em `data/oficina.sqlite`, dentro da pasta do projeto e fora da pasta pública; assim os cadastros acompanham o pendrive mesmo que a letra da unidade mude.
 
-## Preparar no Windows
+## Preparar no Windows 10 ou no Windows 11.
 
 1. Copie a pasta inteira para o pendrive.
 2. No primeiro uso, conecte à internet e execute `PREPARAR_PENDRIVE.bat`. Ele baixa o PHP oficial x64 para `runtime/php` no próprio pendrive.
