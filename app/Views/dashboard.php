@@ -199,7 +199,7 @@ $partsLocked = $editingOrder && $editing['status'] === 'Cancelada';
     <aside>
         <p class="brand">Oficina <span>MOTO RACING</span></p>
         <nav aria-label="Navegação principal">
-            <?php foreach (array('motos', 'pecas', 'clientes', 'ordens') as $key): ?>
+            <?php foreach (array('clientes', 'motos', 'pecas', 'ordens') as $key): ?>
                 <?php $pageTitle = $pageTitles[$key]; ?>
                 <a class="<?php echo $page === $key ? 'active' : ''; ?>" href="/?page=<?php echo e($key); ?>"><?php echo e($pageTitle); ?></a>
             <?php endforeach; ?>

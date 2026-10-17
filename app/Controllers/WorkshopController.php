@@ -5,7 +5,7 @@ use App\Models\WorkshopModel;
 
 class WorkshopController
 {
-    private $model;
+    private WorkshopModel $model;
 
     public function __construct(WorkshopModel $model)
     {
