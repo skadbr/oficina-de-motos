@@ -12,6 +12,27 @@ Nos próximos usos, basta conectar o pendrive e abrir `INICIAR.bat`. O programa 
 
 O computador precisa ser Windows x64 e pode precisar do Microsoft Visual C++ Redistributable 2015-2022 x64, dependência das distribuições oficiais de PHP para Windows. Se já houver PHP com PDO SQLite no PATH, o iniciador também pode usá-lo.
 
+## Sugestão de segurança: BitLocker To Go
+
+Criptografe o pendrive para proteger o banco SQLite, os backups e os demais arquivos em caso de perda. O BitLocker To Go para ativação normalmente está disponível nas edições Windows Pro, Enterprise e Education; alguns computadores com Windows Home oferecem Criptografia do dispositivo, que é um recurso diferente.
+
+### Ativar
+
+1. Faça uma cópia de segurança dos arquivos importantes e conecte o pendrive.
+2. No Explorador de Arquivos, abra **Este Computador**, clique com o botão direito na unidade USB e escolha **Ativar BitLocker**. Se a opção não aparecer, procure **Gerenciar BitLocker** no menu Iniciar e verifique **Unidades de dados removíveis**.
+3. Escolha desbloquear a unidade com uma senha e crie uma senha forte.
+4. Salve a chave de recuperação em outro local seguro. Não a guarde no mesmo pendrive.
+5. Para um pendrive que já contém arquivos, escolha criptografar a unidade inteira. Escolha o modo compatível para facilitar o uso em outros computadores Windows.
+6. Inicie a criptografia e aguarde a conclusão antes de remover o pendrive.
+
+### Usar e descriptografar
+
+1. Para usar o sistema, conecte o pendrive, abra a unidade e informe a senha. Se não lembrar a senha, use a chave de recuperação.
+2. Ao terminar, ejete o pendrive com segurança. Desbloqueá-lo para uso não remove a criptografia.
+3. Para remover permanentemente a proteção, desbloqueie a unidade, abra **Gerenciar BitLocker**, escolha **Desativar BitLocker** para o pendrive e aguarde a descriptografia terminar.
+
+Desativar o BitLocker deixa todos os arquivos legíveis para quem tiver o pendrive. Mantenha a criptografia ativada para proteção contra perda do dispositivo. Backups salvos fora do pendrive criptografado precisam de proteção própria.
+
 ## MVC
 
 - `app/Controllers`: recebe as ações e prepara a resposta.
